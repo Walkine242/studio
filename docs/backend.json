@@ -1,0 +1,189 @@
+
+{
+  "entities": {
+    "RaceResult": {
+      "title": "Race Result",
+      "description": "A record of a swimmer's race performance.",
+      "type": "object",
+      "properties": {
+        "swimmerId": {
+          "type": "string"
+        },
+        "event": {
+          "type": "string"
+        },
+        "totalTime": {
+          "type": "number"
+        },
+        "laps": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "country": {
+          "type": "string"
+        },
+        "meetId": {
+          "type": "string"
+        },
+        "round": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "swimmerId",
+        "event",
+        "totalTime",
+        "date"
+      ]
+    },
+    "Award": {
+      "title": "Award",
+      "description": "A digital trophy earned by a swimmer.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "meet": {
+          "type": "string"
+        },
+        "rank": {
+          "type": "number"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "meet",
+        "rank",
+        "date"
+      ]
+    },
+    "Party": {
+      "title": "Party",
+      "description": "A race lobby or meet event group.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "event": {
+          "type": "string"
+        },
+        "isPublic": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "waiting",
+            "in-progress",
+            "finished"
+          ]
+        },
+        "hostId": {
+          "type": "string"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "memberCount": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "meetId": {
+          "type": "string"
+        },
+        "round": {
+          "type": "string"
+        },
+        "qualifiedSwimmers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "code",
+        "event",
+        "isPublic",
+        "status",
+        "hostId",
+        "members",
+        "memberCount"
+      ]
+    },
+    "Meet": {
+      "title": "Meet",
+      "description": "A scheduled public swim meet competition.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "isChampionship": { "type": "boolean" },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "rounds": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "startTime": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "auth": {
+    "providers": [
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "/race-results/{resultId}": {
+      "schema": "RaceResult",
+      "description": "Collection of race results for all swimmers."
+    },
+    "/awards/{awardId}": {
+      "schema": "Award",
+      "description": "Collection of awards earned by swimmers."
+    },
+    "/parties/{partyId}": {
+      "schema": "Party",
+      "description": "Lobbies and public meet event groups."
+    },
+    "/meets/{meetId}": {
+      "schema": "Meet",
+      "description": "Dynamic meet configurations created by admin."
+    }
+  }
+}

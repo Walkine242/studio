@@ -1,0 +1,52 @@
+{
+  "placeholderImages": [
+    {
+      "id": "dashboard-personal-bests",
+      "description": "A swimmer celebrating in the pool after a race, signifying a personal best.",
+      "imageUrl": "https://images.unsplash.com/photo-1669185694564-2da287319e13?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxzd2ltbWluZyUyMHBlcnNvbmFsJTIwYmVzdHxlbnwwfHx8fDE3NjYzMzk2OTd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "swimmer celebrating"
+    },
+    {
+      "id": "dashboard-goals",
+      "description": "A target floating in a swimming pool.",
+      "imageUrl": "https://images.unsplash.com/photo-1655882639236-fce3d6e24efd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHx0YXJnZXQlMjBwb29sfGVufDB8fHx8MTc1ODczOTYwNnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "target pool"
+    },
+    {
+      "id": "dashboard-workout-generator",
+      "description": "A swimmer doing freestyle in a pool.",
+      "imageUrl": "https://images.unsplash.com/photo-1727079106455-1142591f4dd0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxTV0lNJTIwVFJBSU5JTkd8ZW58MHx8fHwxNzY2MzYxMTEwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "swimmer training"
+    },
+    {
+      "id": "dashboard-dual",
+      "description": "Two swimmers diving into a pool to start a race.",
+      "imageUrl": "https://r0.image2url.com/images/1766270310106-3266ea81-a525-4254-9abe-90703cbcd044.png",
+      "imageHint": "swimmers racing"
+    },
+    {
+      "id": "premium-header",
+      "description": "A swimmer diving into a pool with a golden light effect.",
+      "imageUrl": "https://images.unsplash.com/photo-1607309662299-33455fbf33cc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxzd2ltbWVyJTIwZ29sZHxlbnwwfHx8fDE3NTg3Mzk2MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "swimmer gold"
+    },
+    {
+      "id": "landing-background",
+      "description": "A swimmer at the starting block of a pool.",
+      "imageUrl": "https://image2url.com/images/1763760702180-bdd1ac21-d294-4f48-9fbe-5524b262eee3.jpg",
+      "imageHint": "swimmer starting"
+    },
+    {
+      "id": "dual-custom-race",
+      "description": "A swimmer practicing in a pool lane.",
+      "imageUrl": "https://images.unsplash.com/photo-1609601245136-65c32298fb30?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8c3dpbSUyMHByYWN0aWNlfGVufDB8fHx8MTc1ODc0MTU5NXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "swimmer practice"
+    },
+    {
+      "id": "connecting-background",
+      "description": "Starting blocks lined up at the edge of a swimming pool.",
+      "imageUrl": "https://images.unsplash.com/photo-1542648834-8b548a393b4f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxzd2ltbWluZyUyMHBvb2wlMjBzdGFydGluZyUyMGJsb2Nrc3xlbnwwfHx8fDE3NTg3NDI2NzR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "starting blocks"
+    }
+  ]
+}
