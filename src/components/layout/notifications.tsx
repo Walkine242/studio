@@ -12,42 +12,27 @@ import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import Link from 'next/link';
 
-// Mock data for notifications with static timestamps to avoid hydration mismatches
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'dual_request',
-    from: { name: 'Alex Johnson' },
-    content: '50m Freestyle. You have 24 hours to accept and complete the race.',
-    timestamp: '2025-02-20T10:00:00Z',
-    read: false,
-    partyId: 'mockParty1',
-  },
-  {
-    id: '2',
-    type: 'new_follower',
-    from: { name: 'Yuki Tanaka' },
-    content: 'started following you',
-    timestamp: '2025-02-20T09:30:00Z',
-    read: false,
-  },
-  {
-    id: '3',
-    type: 'result_update',
-    from: { name: 'DUAL' },
-    content: 'Alex Johnson finished 1st in the Summer Splash 50m Freestyle final!',
-    timestamp: '2025-02-20T08:00:00Z',
-    read: true,
-  },
-  {
-    id: '4',
-    type: 'friend_request',
-    from: { name: 'Fatima Al-Fahim' },
-    content: 'sent you a friend request',
-    timestamp: '2025-02-20T05:00:00Z',
-    read: true,
-  },
-];
+const NOTIFICATIONS_KEY = 'dual_user_notifications';
+
+export function getStoredNotifications(): Notification[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  
+  // Default clean welcome notification for new users
+  return [
+    {
+      id: 'welcome-1',
+      type: 'result_update',
+      from: { name: 'DUAL' },
+      content: 'Welcome to Dual! Enter virtual meets, generate AI workouts, and track leaderboards.',
+      timestamp: new Date().toISOString(),
+      read: false,
+    },
+  ];
+}
 
 const NotificationIcon = ({ type }: { type: Notification['type'] }) => {
   switch (type) {
@@ -68,12 +53,20 @@ const NotificationIcon = ({ type }: { type: Notification['type'] }) => {
 };
 
 export function Notifications({ newNotification }: { newNotification?: Notification | null }) {
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
+    setNotifications(getStoredNotifications());
+  }, []);
+
+  useEffect(() => {
     if (newNotification && !notifications.find(n => n.id === newNotification.id)) {
-      setNotifications(prev => [newNotification, ...prev]);
+      const updated = [newNotification, ...notifications];
+      setNotifications(updated);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
+      }
     }
   }, [newNotification, notifications]);
 
@@ -81,9 +74,12 @@ export function Notifications({ newNotification }: { newNotification?: Notificat
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
-    if (!open) {
-      // Mark all as read when popover closes
-      setNotifications(notifications.map(n => ({ ...n, read: true })));
+    if (!open && notifications.some(n => !n.read)) {
+      const readAll = notifications.map(n => ({ ...n, read: true }));
+      setNotifications(readAll);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(readAll));
+      }
     }
   };
 
@@ -95,70 +91,50 @@ export function Notifications({ newNotification }: { newNotification?: Notificat
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 justify-center p-0"
+              className="absolute -top-1 -right-1 h-5 w-5 justify-center p-0 text-[10px]"
             >
               {unreadCount}
             </Badge>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0">
-        <div className="p-4 font-bold border-b">Notifications</div>
-        <div className="flex flex-col">
+      <PopoverContent className="w-80 p-0 bg-slate-950 text-white border-white/10 shadow-2xl">
+        <div className="p-4 font-bold border-b border-white/10 flex items-center justify-between">
+          <span>Notifications</span>
+          {unreadCount > 0 && (
+            <Badge variant="outline" className="text-[10px] text-orange-400 border-orange-500/40">
+              {unreadCount} New
+            </Badge>
+          )}
+        </div>
+        <div className="flex flex-col max-h-80 overflow-y-auto divide-y divide-white/5">
           {notifications.length > 0 ? (
             notifications.map((n) => (
               <div
                 key={n.id}
                 className={cn(
-                  'flex items-start gap-3 p-4 border-b hover:bg-muted',
-                  !n.read && 'bg-primary/5'
+                  'flex items-start gap-3 p-4 hover:bg-white/5 transition-colors',
+                  !n.read && 'bg-orange-500/10'
                 )}
               >
-                <div className="mt-1">
+                <div className="mt-1 shrink-0">
                   <NotificationIcon type={n.type} />
                 </div>
                 <div className="flex-1 text-sm">
-                  <p>
-                    <span className="font-bold">{n.from.name}</span> {n.content}
+                  <p className="text-slate-200">
+                    <span className="font-bold text-white">{n.from.name}</span> {n.content}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-slate-400 mt-1">
                     {new Date(n.timestamp).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </p>
-                  {n.type === 'dual_request' && !n.read && n.partyId && (
-                    <div className="mt-2 flex gap-2">
-                      <Button size="sm" asChild>
-                        <Link href={`/dual/connecting/${n.partyId}`}>Accept</Link>
-                      </Button>
-                      <Button size="sm" variant="outline">Decline</Button>
-                    </div>
-                  )}
-                  {n.type === 'new_follower' && !n.read && (
-                    <div className="mt-2">
-                      <Button size="sm" asChild>
-                        <Link href="/profile">Follow Back</Link>
-                      </Button>
-                    </div>
-                  )}
-                  {n.type === 'workout_share' && !n.read && (
-                    <div className="mt-2">
-                      <Button size="sm" asChild>
-                        <Link href="/workout-generator">View Workout</Link>
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </div>
             ))
           ) : (
-            <p className="p-4 text-center text-sm text-muted-foreground">
+            <p className="p-6 text-center text-sm text-slate-400">
               No new notifications.
             </p>
           )}
-        </div>
-        <div className="p-2 text-center border-t">
-          <Button variant="link" size="sm" asChild>
-            <Link href="/notifications">View all</Link>
-          </Button>
         </div>
       </PopoverContent>
     </Popover>
