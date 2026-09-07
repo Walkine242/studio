@@ -765,8 +765,8 @@ function WorkoutLogsList({ userId }: { userId: string }) {
 
 function FriendsList({ profileData }: { profileData: UserProfileData }) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [following, setFollowing] = useState(['user_2', 'user_3']);
-    const [followers, setFollowers] = useState(['user_2', 'user_4']);
+    const [following, setFollowing] = useState<string[]>([]);
+    const [followers, setFollowers] = useState<string[]>([]);
     const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
     
     const handleFollowToggle = (userId: string) => {

@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserCheck, Sparkles, LogIn, UserPlus } from 'lucide-react';
+import { UserCheck, Sparkles, LogIn, UserPlus, Lock, KeyRound } from 'lucide-react';
 import { countries } from '@/lib/countries';
 import { useToast } from '@/hooks/use-toast';
 
@@ -43,7 +43,7 @@ export function saveCurrentAccount(account: UserAccount) {
   if (typeof window === 'undefined') return;
   localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(account));
   
-  // Sync legacy aquaSpeed-userProfile so header & profile pages update
+  // Sync legacy profile so header & profile pages update
   localStorage.setItem('aquaSpeed-userProfile', JSON.stringify({
     name: account.name,
     country: account.country,
@@ -79,24 +79,48 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
   const [tab, setTab] = useState<'signup' | 'login'>('signup');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [country, setCountry] = useState('USA');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing Fields',
+        description: 'Name, email, and password are required to create an account.',
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        variant: 'destructive',
+        title: 'Password Too Short',
+        description: 'Password must be at least 6 characters.',
+      });
+      return;
+    }
 
     setLoading(true);
     setTimeout(() => {
+      const formattedEmail = email.trim().toLowerCase();
       const userId = 'user_' + Math.random().toString(36).substring(2, 9);
       const newAccount: UserAccount = {
         userId,
         name: name.trim(),
-        email: email.trim().toLowerCase(),
+        email: formattedEmail,
         country,
         isLoggedIn: true,
       };
+
+      // Save credentials for login validation
+      localStorage.setItem(`dual_user_creds_${formattedEmail}`, JSON.stringify({
+        ...newAccount,
+        password: password.trim(),
+      }));
 
       saveCurrentAccount(newAccount);
       setLoading(false);
@@ -104,7 +128,7 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
 
       toast({
         title: 'Account Created! 🎉',
-        description: `Welcome to Dual, ${name.trim()}! You now have full access to basic features.`,
+        description: `Welcome to Dual, ${name.trim()}! Your profile is active.`,
       });
 
       if (onSuccess) onSuccess();
@@ -113,27 +137,77 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!email.trim() || !password.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing Fields',
+        description: 'Both email and password are required to log in.',
+      });
+      return;
+    }
 
     setLoading(true);
     setTimeout(() => {
-      const existingName = name.trim() || email.split('@')[0];
+      const formattedEmail = email.trim().toLowerCase();
+      const storedCredsRaw = localStorage.getItem(`dual_user_creds_${formattedEmail}`);
+
+      if (storedCredsRaw) {
+        try {
+          const storedCreds = JSON.parse(storedCredsRaw);
+          if (storedCreds.password !== password.trim()) {
+            setLoading(false);
+            toast({
+              variant: 'destructive',
+              title: 'Incorrect Password',
+              description: 'The password you entered is incorrect. Please try again.',
+            });
+            return;
+          }
+
+          const account: UserAccount = {
+            userId: storedCreds.userId || 'user_' + Math.random().toString(36).substring(2, 9),
+            name: storedCreds.name || formattedEmail.split('@')[0],
+            email: formattedEmail,
+            country: storedCreds.country || 'USA',
+            isLoggedIn: true,
+          };
+
+          saveCurrentAccount(account);
+          setLoading(false);
+          onOpenChange(false);
+
+          toast({
+            title: 'Welcome Back! 👋',
+            description: `Logged in as ${account.name}. Your profile and member benefits are active.`,
+          });
+
+          if (onSuccess) onSuccess();
+          return;
+        } catch {}
+      }
+
+      // If user logs in for the first time with new password
       const userId = 'user_' + Math.random().toString(36).substring(2, 9);
-      const account: UserAccount = {
+      const newAccount: UserAccount = {
         userId,
-        name: existingName,
-        email: email.trim().toLowerCase(),
-        country,
+        name: name.trim() || formattedEmail.split('@')[0],
+        email: formattedEmail,
+        country: 'USA',
         isLoggedIn: true,
       };
 
-      saveCurrentAccount(account);
+      localStorage.setItem(`dual_user_creds_${formattedEmail}`, JSON.stringify({
+        ...newAccount,
+        password: password.trim(),
+      }));
+
+      saveCurrentAccount(newAccount);
       setLoading(false);
       onOpenChange(false);
 
       toast({
-        title: 'Welcome Back! 👋',
-        description: `Logged in as ${account.name}. Your profile and member benefits are active.`,
+        title: 'Logged In! 🎉',
+        description: `Welcome back, ${newAccount.name}!`,
       });
 
       if (onSuccess) onSuccess();
@@ -146,10 +220,10 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
         <DialogHeader className="space-y-2">
           <DialogTitle className="font-headline text-2xl font-bold text-white flex items-center gap-2">
             <Sparkles className="size-6 text-orange-400 animate-pulse" />
-            Join Dual Swim
+            Dual Swim Account
           </DialogTitle>
           <DialogDescription className="text-slate-300">
-            Create your Dual Swim account or log in to access basic features, leaderboards, and swim meets.
+            Create an account or log in with your email & password to access basic features and swim meets.
           </DialogDescription>
         </DialogHeader>
 
@@ -163,7 +237,7 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
             </TabsTrigger>
           </TabsList>
 
-          {/* SIGN UP FORM */}
+          {/* CREATE ACCOUNT FORM */}
           <TabsContent value="signup" className="pt-4">
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
@@ -196,6 +270,22 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="signup-password" className="text-xs font-semibold text-slate-200">
+                  Password
+                </Label>
+                <Input
+                  id="signup-password"
+                  type="password"
+                  placeholder="••••••••"
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-orange-500"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="signup-country" className="text-xs font-semibold text-slate-200">
                   Country
                 </Label>
@@ -218,7 +308,7 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
                 disabled={loading}
                 className="w-full h-11 text-sm font-bold bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg mt-2"
               >
-                {loading ? 'Creating Account...' : 'Create Dual Swim Profile & Access App'}
+                {loading ? 'Creating Account...' : 'Create Dual Swim Account & Access App'}
               </Button>
             </form>
           </TabsContent>
@@ -242,14 +332,16 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="login-name" className="text-xs font-semibold text-slate-200">
-                  Swimmer Name (Optional)
+                <Label htmlFor="login-password" className="text-xs font-semibold text-slate-200">
+                  Password
                 </Label>
                 <Input
-                  id="login-name"
-                  placeholder="e.g. Katie Ledecky"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  id="login-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                   className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-500"
                 />
               </div>
