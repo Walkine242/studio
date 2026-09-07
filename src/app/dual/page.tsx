@@ -243,9 +243,9 @@ export default function DualPage() {
                                 ) : (
                                   <Button
                                     onClick={() => setIsCheckoutOpen(true)}
-                                    className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold"
+                                    className="w-full min-h-[40px] h-auto py-2 px-2 text-xs sm:text-sm bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-center flex items-center justify-center"
                                   >
-                                    <Lock className="mr-2 size-4" /> Upgrade to Join ($20/yr)
+                                    <Lock className="mr-1.5 size-3.5 shrink-0" /> <span>Upgrade to Join ($20/yr)</span>
                                   </Button>
                                 )}
                             </CardContent>

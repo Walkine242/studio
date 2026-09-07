@@ -161,7 +161,7 @@ export function CheckoutModal({ open, onOpenChange, onSuccess }: CheckoutModalPr
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-12 text-base font-bold bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg"
+              className="w-full min-h-[44px] h-auto py-2.5 px-2 text-xs sm:text-sm font-bold bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg text-center flex items-center justify-center"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

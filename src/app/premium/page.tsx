@@ -237,13 +237,13 @@ export default function PremiumPage() {
                 <CardFooter className="pt-4">
                   <Button
                     onClick={() => setIsCheckoutOpen(true)}
-                    className={`w-full font-bold text-md h-12 ${
+                    className={`w-full min-h-[44px] h-auto py-2.5 px-2 text-xs sm:text-sm font-bold tracking-tight text-center flex items-center justify-center ${
                       plan.popular
                         ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-lg'
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
-                    {`Unlock ${plan.name} (${plan.price})`}
+                    <span>{`Unlock ${plan.name} (${plan.price})`}</span>
                   </Button>
                 </CardFooter>
               </Card>
