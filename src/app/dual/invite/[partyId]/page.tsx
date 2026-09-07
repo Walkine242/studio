@@ -1,20 +1,21 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { getParty, Party } from '@/lib/services/party-service';
+import { getParty } from '@/lib/services/party-service';
+import type { Party } from '@/lib/types';
 import { Loader2, Copy, Users, Watch, Send, Check, SkipForward } from 'lucide-react';
 import Link from 'next/link';
 import { getFriends, Friend } from '@/lib/friends';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-export default function InvitePage({ params }: { params: { partyId: string } }) {
-  const partyId = params.partyId;
+export default function InvitePage({ params }: { params: Promise<{ partyId: string }> }) {
+  const { partyId } = React.use(params);
   const router = useRouter();
   const { toast } = useToast();
   const [party, setParty] = useState<Party | null>(null);

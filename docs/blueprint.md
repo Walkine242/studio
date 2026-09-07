@@ -1,4 +1,4 @@
-# **App Name**: AquaSpeed
+# **App Name**: Dual
 
 ## Core Features:
 

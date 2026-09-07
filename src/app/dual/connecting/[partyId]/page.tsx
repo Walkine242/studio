@@ -1,6 +1,6 @@
 
 'use client';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
@@ -13,9 +13,9 @@ const statusMessages = [
     'Good luck!',
 ];
 
-export default function ConnectingPage({ params }: { params: { partyId: string } }) {
+export default function ConnectingPage({ params }: { params: Promise<{ partyId: string }> }) {
     const router = useRouter();
-    const { partyId } = params;
+    const { partyId } = React.use(params);
     const [statusIndex, setStatusIndex] = useState(0);
     const image = PlaceHolderImages.find(img => img.id === 'connecting-background');
 

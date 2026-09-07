@@ -51,7 +51,7 @@ function notifyPartyListeners(partyId: string) {
   
   if (party && party.status === 'finished' && party.round === 'Finals' && party.members.length > 0) {
     const topFinishers = party.members.slice(0, 3);
-    topFinishers.forEach((swimmerId, index) => {
+    topFinishers.forEach((swimmerId: string, index: number) => {
       const rank = index + 1;
       const place = rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd';
       const title = `${place} Place - ${party.event}`;
@@ -177,7 +177,8 @@ export async function getQualifiedSwimmersForNextRound(
   const qualifiedIds = filteredResults
     .sort((a, b) => a.totalTime - b.totalTime)
     .slice(0, limitCount)
-    .map((d) => d.swimmerId);
+    .map((d) => d.swimmerId)
+    .filter((id): id is string => !!id);
   
   return qualifiedIds;
 }

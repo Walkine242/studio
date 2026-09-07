@@ -125,3 +125,19 @@ export interface Ranking {
     rank: number | 'N/A';
     points: number;
 }
+
+export interface Party {
+  id: string;
+  code: string;
+  event: string;
+  isPublic: boolean;
+  status: 'waiting' | 'in-progress' | 'finished';
+  hostId: string;
+  members: string[];
+  memberCount: number;
+  createdAt: { seconds: number; nanoseconds: number } | string;
+  meetId?: string;
+  round?: string;
+  qualifiedSwimmers?: string[];
+}
+

@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import type { AllTimePoints, RaceResult } from '@/lib/types';
-import type { Party } from '../services/party-service';
+import type { AllTimePoints, RaceResult, Party } from '@/lib/types';
 import { getAllRaceResults } from '../services/race-results-service';
 
 const FINALS_POINTS = [9, 7, 6, 5, 4, 3, 2, 1];
@@ -59,7 +58,7 @@ export function useAllTimePoints(country?: string) {
             .filter(Boolean) as string[]
         );
         parties.forEach((party) => {
-            party.members = party.members.filter((memberId) => countrySwimmerIds.has(memberId));
+            party.members = party.members.filter((memberId: string) => countrySwimmerIds.has(memberId));
         });
         allRaceResults = allRaceResults.filter((r) => r.country === country);
     }

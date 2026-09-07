@@ -30,6 +30,22 @@ const WorkoutGeneratorInputSchema = z.object({
     .array(z.string())
     .optional()
     .describe('A list of available swimming equipment (e.g., Kickboard, Fins, Paddles).'),
+  duration: z
+    .string()
+    .optional()
+    .describe('The target duration of the workout (e.g., 30 minutes, 60 minutes).'),
+  intensity: z
+    .string()
+    .optional()
+    .describe('The workout intensity/focus (e.g., recovery, aerobic endurance, threshold/sprint).'),
+  basePace: z
+    .string()
+    .optional()
+    .describe('The swimmer\'s target swim interval pace per 100m/yd (e.g., 1:30, 1:45). If none, say N/A.'),
+  restInterval: z
+    .string()
+    .optional()
+    .describe('The swimmer\'s preferred rest interval between repetitions in seconds (e.g., 15s, 30s). If none, say N/A.'),
 });
 
 export type WorkoutGeneratorInput = z.infer<typeof WorkoutGeneratorInputSchema>;
@@ -50,10 +66,14 @@ const prompt = ai.definePrompt({
   output: {schema: WorkoutGeneratorOutputSchema},
   prompt: `You are Coach Mikey, an expert swim coach, skilled at creating tailored workout plans for swimmers of all levels.
 
-  Based on the swimmer's input, generate a workout plan that helps them achieve their goals. Format the output as if you were writing on a whiteboard for a swimmer to read, using clear headings (like "Warm Up", "Main Set", "Cool Down") and bullet points for the sets. If the user provides a list of available equipment, incorporate it into the workout.
+  Based on the swimmer's input, generate a workout plan that helps them achieve their goals. Format the output as if you were writing on a whiteboard for a swimmer to read, using clear headings (like "Warm Up", "Main Set", "Cool Down") and bullet points for the sets. Incorporate the custom swim intervals and rest pacing directly into the reps if specified. If the user provides a list of available equipment, incorporate it into the workout.
 
   Swimmer Experience: {{{experience}}}
   Practice Distance: {{{typicalDistance}}}
+  Workout Duration: {{{duration}}}
+  Workout Intensity: {{{intensity}}}
+  Target Swim Pace: {{{basePace}}} per 100m
+  Rest Interval: {{{restInterval}}}
   Current Training Plan: {{{currentTrainingPlan}}}
   Target Stroke: {{{targetStroke}}}
   Available Equipment: {{#if equipment}}{{#each equipment}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}None{{/if}}
@@ -72,3 +92,51 @@ const workoutGeneratorFlow = ai.defineFlow(
     return output!;
   }
 );
+
+const WorkoutAnalysisInputSchema = z.object({
+  targetPace: z.string().describe('The swimmer\'s target swim interval pace (e.g. 1:30 per 100m).'),
+  avgPace: z.string().describe('The swimmer\'s actual average swim pace recorded (e.g. 1:28 per 100m).'),
+  duration: z.string().describe('The duration of the workout completed.'),
+  laps: z.number().describe('The number of laps completed.'),
+  avgHeartRate: z.number().describe('The average heart rate in BPM.'),
+  strokeFocus: z.string().describe('The focus stroke of the workout.'),
+  splits: z.array(z.string()).describe('Detailed lap split times.'),
+});
+
+const WorkoutAnalysisOutputSchema = z.object({
+  feedback: z.string().describe('Constructive performance analysis from Coach Mikey. Use bullet points and paragraphs.'),
+});
+
+export async function analyzeWorkoutPerformance(input: z.infer<typeof WorkoutAnalysisInputSchema>) {
+  return workoutAnalysisFlow(input);
+}
+
+const analysisPrompt = ai.definePrompt({
+  name: 'workoutAnalysisPrompt',
+  input: {schema: WorkoutAnalysisInputSchema},
+  output: {schema: WorkoutAnalysisOutputSchema},
+  prompt: `You are Coach Mikey, an expert swim coach. Analyze this swimmer's performance data and provide constructive, detailed feedback. Compare their target pace with their actual average pace, comment on their heart rate management during the session, analyze their lap splits consistency, and give 2-3 specific recommendations for their technique.
+
+  Target Pace: {{{targetPace}}}
+  Actual Avg Pace: {{{avgPace}}}
+  Duration: {{{duration}}}
+  Laps Completed: {{{laps}}}
+  Avg Heart Rate: {{{avgHeartRate}}} BPM
+  Stroke Focus: {{{strokeFocus}}}
+  Splits: {{{splits}}}
+
+  Performance Analysis:`,
+});
+
+const workoutAnalysisFlow = ai.defineFlow(
+  {
+    name: 'workoutAnalysisFlow',
+    inputSchema: WorkoutAnalysisInputSchema,
+    outputSchema: WorkoutAnalysisOutputSchema,
+  },
+  async input => {
+    const {output} = await analysisPrompt(input);
+    return output!;
+  }
+);
+

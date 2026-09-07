@@ -1,5 +1,6 @@
 
 'use client';
+import React from 'react';
 import { ProfileLayout } from '@/components/profile/profile-layout';
 import type { UserProfileData } from '@/lib/types';
 import { countries } from '@/lib/countries';
@@ -20,8 +21,8 @@ const getMockProfileData = (userId: string): UserProfileData => {
     };
 };
 
-export default function UserProfilePage({ params }: { params: { userId: string } }) {
-    const { userId } = params;
+export default function UserProfilePage({ params }: { params: Promise<{ userId: string }> }) {
+    const { userId } = React.use(params);
     
     if (typeof userId !== 'string') {
         return <div>User not found.</div>;

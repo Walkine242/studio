@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AppPagesLayout } from './app-pages-layout';
-import { FirebaseErrorListener } from '@/components/firebase-error-listener';
 
 export const metadata: Metadata = {
   title: 'Dual',
@@ -26,7 +25,6 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <AppPagesLayout>{children}</AppPagesLayout>
-        <FirebaseErrorListener />
         <Toaster />
       </body>
     </html>

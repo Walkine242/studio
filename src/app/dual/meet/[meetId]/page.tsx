@@ -21,10 +21,12 @@ import { Clock, ChevronRight, Lock, Trophy } from 'lucide-react';
 import { format } from 'date-fns';
 import { findOrCreatePartyForEvent, getQualifiedSwimmersForNextRound } from '@/lib/services/party-service';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { getDynamicMeets } from '@/lib/services/meet-service';
 import type { Meet } from '@/lib/types';
+import { usePremiumMember } from '@/lib/hooks/use-premium-member';
+import { CheckoutModal } from '@/components/checkout-modal';
 
 const getUserId = () => {
     if (typeof window !== 'undefined') {
@@ -80,10 +82,12 @@ const EventCountdown = ({ meetDate, startTime }: { meetDate: string, startTime: 
     return { timeLeft, isExpired };
 };
 
-export default function MeetPage({ params }: { params: { meetId: string } }) {
-  const { meetId } = params;
+export default function MeetPage({ params }: { params: Promise<{ meetId: string }> }) {
+  const { meetId } = React.use(params);
   const router = useRouter();
   const { toast } = useToast();
+  const { isPremium } = usePremiumMember();
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [qualifications, setQualifications] = useState<Record<string, boolean>>({});
@@ -169,6 +173,15 @@ export default function MeetPage({ params }: { params: { meetId: string } }) {
   }
 
   const handleJoin = async (eventName: string, roundName: string) => {
+    if (!isPremium) {
+      setIsCheckoutOpen(true);
+      toast({
+        title: 'Annual Membership Required ($20.00/yr)',
+        description: 'Public swim meets require an active Dual Annual Membership. Unlock to join!'
+      });
+      return;
+    }
+
     const loadingKey = `${eventName}-${roundName}`;
     setIsLoading(loadingKey);
     try {
@@ -304,6 +317,7 @@ export default function MeetPage({ params }: { params: { meetId: string } }) {
           </Accordion>
         </CardContent>
       </Card>
+      <CheckoutModal open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen} />
     </div>
   );
 }

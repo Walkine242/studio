@@ -1,13 +1,13 @@
-
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { getParty, joinParty, Party } from '@/lib/services/party-service';
+import { getParty, joinParty } from '@/lib/services/party-service';
+import type { Party } from '@/lib/types';
 import { Loader2, Copy, Users, Watch, CheckCircle, BarChart, UserCog } from 'lucide-react';
 import { AppleIcon } from '@/components/icons/apple';
 import { FitbitIcon } from '@/components/icons/fitbit';
@@ -16,8 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type TimingMethod = 'wearable' | 'timer';
 
-export default function LobbyPage({ params }: { params: { partyId: string } }) {
-  const partyId = params.partyId;
+export default function LobbyPage({ params }: { params: Promise<{ partyId: string }> }) {
+  const { partyId } = React.use(params);
   const router = useRouter();
   const { toast } = useToast();
   const [party, setParty] = useState<Party | null>(null);
@@ -205,7 +205,7 @@ export default function LobbyPage({ params }: { params: { partyId: string } }) {
         </CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {party.members.map((member, index) => (
+            {party.members.map((member: string, index: number) => (
               <li
                 key={index}
                 className="flex items-center gap-2 p-2 bg-muted rounded-md"

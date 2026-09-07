@@ -47,6 +47,8 @@ import { subscribeToMeets, createMeet } from '@/lib/services/meet-service';
 import { getUserId } from '@/lib/hooks/use-user-profile';
 import { Badge } from '@/components/ui/badge';
 
+import { CheckoutModal } from '@/components/checkout-modal';
+
 const leagueIcons = {
   winter: <Snowflake className="text-blue-300" />,
   spring: <Flower2 className="text-pink-400" />,
@@ -60,6 +62,7 @@ export default function DualPage() {
   const [joinCode, setJoinCode] = useState<string>('');
   const [dynamicMeets, setDynamicMeets] = useState<Meet[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const { isPremium } = usePremiumMember();
@@ -231,17 +234,20 @@ export default function DualPage() {
                                 <CardDescription>{format(new Date(meet.date), "EEEE, MMMM do, yyyy")}</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <Button asChild className="w-full" disabled={!isPremium}>
-                                  {isPremium ? (
+                                {isPremium ? (
+                                  <Button asChild className="w-full">
                                     <Link href={`/dual/meet/${meet.id}`}>
                                         <Calendar className="mr-2" /> View Schedule & Join
                                     </Link>
-                                  ) : (
-                                    <Link href="/premium">
-                                        <Lock className="mr-2" /> Upgrade to Join
-                                    </Link>
-                                  )}
-                                </Button>
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    onClick={() => setIsCheckoutOpen(true)}
+                                    className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold"
+                                  >
+                                    <Lock className="mr-2 size-4" /> Upgrade to Join ($20/yr)
+                                  </Button>
+                                )}
                             </CardContent>
                         </Card>
                       ))}
@@ -325,6 +331,7 @@ export default function DualPage() {
           </Card>
         </div>
       </div>
+      <CheckoutModal open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen} />
     </div>
   );
 }
