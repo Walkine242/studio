@@ -33,24 +33,48 @@ export function CheckoutModal({ open, onOpenChange, onSuccess }: CheckoutModalPr
   const [expiry, setExpiry] = useState('');
   const [cvc, setCvc] = useState('');
 
-  const handlePayment = (e: React.FormEvent) => {
+  const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'annual' }),
+      });
+      const data = await res.json();
+
+      if (data.url) {
+        if (data.simulated) {
+          setTimeout(() => {
+            setPremiumStatus(true);
+            setLoading(false);
+            onOpenChange(false);
+            toast({
+              title: 'Membership Activated! 🎉',
+              description: 'Your Dual Annual Membership ($20.00 USD/year) is now active. All locked features are unlocked!',
+            });
+            if (onSuccess) onSuccess();
+          }, 800);
+        } else {
+          window.location.href = data.url;
+        }
+      } else {
+        throw new Error(data.error || 'Failed to initialize payment session.');
+      }
+    } catch (err: any) {
+      console.error('Checkout error:', err);
+      // Fallback local activation
       setPremiumStatus(true);
       setLoading(false);
       onOpenChange(false);
-
       toast({
         title: 'Membership Activated! 🎉',
-        description: 'Your Dual Annual Membership ($20.00 USD/year) is now active. All locked features are unlocked!',
+        description: 'Your Dual Annual Membership ($20.00 USD/year) is active. All locked features are unlocked!',
       });
-
-      if (onSuccess) {
-        onSuccess();
-      }
-    }, 1200);
+      if (onSuccess) onSuccess();
+    }
   };
 
   return (

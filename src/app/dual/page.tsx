@@ -65,7 +65,7 @@ export default function DualPage() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const { isPremium } = usePremiumMember();
+  const { isPremium, setPremiumStatus } = usePremiumMember();
   const currentUserId = getUserId();
   const isAdmin = currentUserId === OWNER_USER_ID;
 
@@ -75,8 +75,19 @@ export default function DualPage() {
       const unsubscribe = subscribeToMeets((meets) => {
           setDynamicMeets(meets);
       });
+
+      // Handle Stripe Checkout return redirect
+      if (typeof window !== 'undefined' && window.location.search.includes('payment=success')) {
+        setPremiumStatus(true);
+        toast({
+          title: 'Payment Successful! 🎉',
+          description: 'Thank you for subscribing! Your Dual Annual Membership ($20.00 USD/year) is now active.',
+        });
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
       return () => unsubscribe();
-  }, []);
+  }, [setPremiumStatus, toast]);
 
   const allMeets = useMemo(() => {
       // Merge static config with dynamic ones from DB
