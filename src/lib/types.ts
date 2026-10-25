@@ -1,7 +1,7 @@
 
 
 export interface WorkoutLog {
-    id: number;
+    id: string;
     date: string;
     title: string;
     source: string;
@@ -34,6 +34,7 @@ export interface RaceResult {
   country?: string; // To filter by country
   meetId?: string;
   round?: string;
+  swimmerName?: string;
 }
 
 export interface AllTimeBest {
@@ -45,9 +46,10 @@ export interface AllTimeBest {
 }
 
 export interface AllTimePoints {
-    // For now, we'll use a placeholder for swimmer names.
-    // In a real app, this would be a user ID or name.
+    /** Swimmer's user id. */
     swimmer: string;
+    name: string;
+    country: string;
     points: number;
     races: number;
 }
@@ -135,9 +137,19 @@ export interface Party {
   hostId: string;
   members: string[];
   memberCount: number;
-  createdAt: { seconds: number; nanoseconds: number } | string;
+  createdAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
   meetId?: string;
   round?: string;
   qualifiedSwimmers?: string[];
+  /** Names and countries of members, in join order. */
+  memberProfiles?: SwimmerSummary[];
+}
+
+export interface SwimmerSummary {
+  id: string;
+  name: string;
+  country: string;
 }
 

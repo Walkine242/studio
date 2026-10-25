@@ -18,7 +18,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
-import { CheckoutModal } from '@/components/checkout-modal';
+import { startCheckout } from '@/components/checkout-modal';
 
 const premiumFeatures = [
   {
@@ -89,30 +89,32 @@ const pricingPlans = [
 ];
 
 export default function PremiumPage() {
-  const { isPremium, setPremiumStatus } = usePremiumMember();
+  const { isPremium } = usePremiumMember();
   const { toast } = useToast();
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
   const image = PlaceHolderImages.find((img) => img.id === 'premium-header');
 
-  const handleSubscribe = (planName: string) => {
-    setLoading(true);
-    setTimeout(() => {
-      setPremiumStatus(true);
-      setLoading(false);
-      toast({
-        title: 'Welcome to Dual Pro Membership! 🎉',
-        description: `Your ${planName} has been successfully activated. All premium features are unlocked!`,
-      });
-    }, 600);
+  const handleSubscribe = async (planId: string) => {
+    setLoadingPlan(planId);
+    const error = await startCheckout(planId as 'monthly' | 'annual' | 'lifetime');
+    if (error) {
+      setLoadingPlan(null);
+      toast({ variant: 'destructive', title: 'Checkout Unavailable', description: error });
+    }
   };
 
-  const handleCancel = () => {
-    setPremiumStatus(false);
-    toast({
-      title: 'Membership Updated',
-      description: 'Your premium membership has been set back to the Free plan.',
-    });
+  // Cancel or update payment details in Stripe's billing portal.
+  const handleManage = async () => {
+    setLoadingPlan('manage');
+    const res = await fetch('/api/billing-portal', { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.url) {
+      window.location.href = data.url;
+      return;
+    }
+    setLoadingPlan(null);
+    toast({ variant: 'destructive', title: 'Could Not Open Billing', description: data.error || 'Please try again.' });
   };
 
   return (
@@ -172,7 +174,7 @@ export default function PremiumPage() {
       <div className="space-y-6">
         <div className="text-center space-y-2">
           <h2 className="text-3xl font-extrabold text-white">Choose Your Membership Plan</h2>
-          <p className="text-slate-300">Flexible pricing options with instant unlock.</p>
+          <p className="text-slate-300">Secure checkout by Stripe. Your membership activates as soon as payment clears.</p>
         </div>
 
         {isPremium ? (
@@ -193,8 +195,8 @@ export default function PremiumPage() {
               <Link href="/dual" className="text-sm text-emerald-300 hover:underline">
                 Explore Dual Meets & Leaderboards →
               </Link>
-              <Button variant="outline" onClick={handleCancel} className="border-emerald-500/30 text-emerald-200 hover:bg-emerald-900/40">
-                Switch to Free Plan
+              <Button variant="outline" onClick={handleManage} disabled={loadingPlan === 'manage'} className="border-emerald-500/30 text-emerald-200 hover:bg-emerald-900/40">
+                {loadingPlan === 'manage' ? 'Opening...' : 'Manage Billing / Cancel'}
               </Button>
             </CardFooter>
           </Card>
@@ -236,14 +238,15 @@ export default function PremiumPage() {
 
                 <CardFooter className="pt-4">
                   <Button
-                    onClick={() => setIsCheckoutOpen(true)}
+                    onClick={() => handleSubscribe(plan.id)}
+                    disabled={!!loadingPlan}
                     className={`w-full min-h-[44px] h-auto py-2.5 px-2 text-xs sm:text-sm font-bold tracking-tight text-center flex items-center justify-center ${
                       plan.popular
                         ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-lg'
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
-                    <span>{`Unlock ${plan.name} (${plan.price})`}</span>
+                    <span>{loadingPlan === plan.id ? 'Opening secure checkout...' : `Unlock ${plan.name} (${plan.price})`}</span>
                   </Button>
                 </CardFooter>
               </Card>
@@ -251,7 +254,6 @@ export default function PremiumPage() {
           </div>
         )}
       </div>
-      <CheckoutModal open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen} />
     </div>
   );
 }

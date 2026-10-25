@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AppPagesLayout } from './app-pages-layout';
+import { AuthProvider } from '@/lib/auth/auth-provider';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://dualswim.app'),
@@ -50,8 +51,10 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <AppPagesLayout>{children}</AppPagesLayout>
-        <Toaster />
+        <AuthProvider>
+          <AppPagesLayout>{children}</AppPagesLayout>
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

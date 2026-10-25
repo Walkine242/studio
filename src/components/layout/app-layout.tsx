@@ -11,8 +11,8 @@ import { Notifications } from './notifications';
 import { useLoginStreak } from '@/lib/hooks/use-login-streak';
 import type { Notification } from '@/lib/types';
 import { usePathname } from 'next/navigation';
-import { AuthModal, getCurrentAccount, logoutAccount, type UserAccount } from '../auth/auth-modal';
-import { usePremiumMember } from '@/lib/hooks/use-premium-member';
+import { AuthModal } from '../auth/auth-modal';
+import { useAuth } from '@/lib/auth/auth-provider';
 import { Badge } from '../ui/badge';
 import {
   DropdownMenu,
@@ -26,33 +26,24 @@ import {
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [account, setAccount] = useState<UserAccount | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
   const pathname = usePathname();
   const { streak, isNewStreak } = useLoginStreak();
-  const { isPremium } = usePremiumMember();
+  const { user, profile, isPremium, isLoading, signOut } = useAuth();
   const [streakNotification, setStreakNotification] = useState<Notification | null>(null);
-
-  const refreshAccount = () => {
-    if (typeof window !== 'undefined') {
-      const current = getCurrentAccount();
-      setAccount(current);
-      // If user is on an app page (not landing page '/') and has no account, open Auth Modal
-      if (pathname !== '/' && (!current || !current.isLoggedIn)) {
-        setIsAuthOpen(true);
-      }
-    }
-  };
 
   useEffect(() => {
     setMounted(true);
-    refreshAccount();
+  }, []);
 
-    const handleStorage = () => refreshAccount();
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, [pathname]);
+  // App pages need an account: prompt to sign up / log in when there isn't one.
+  useEffect(() => {
+    if (!isLoading && !user && !pathname.startsWith('/auth')) {
+      setIsAuthOpen(true);
+    }
+    if (user) setIsAuthOpen(false);
+  }, [isLoading, user, pathname]);
 
   useEffect(() => {
     if (isNewStreak && streak > 0) {
@@ -108,12 +99,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Notifications newNotification={streakNotification} />
 
           {/* Account Profile Status / Login Button */}
-          {account && account.isLoggedIn ? (
+          {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="bg-white/10 border-white/20 text-white hover:bg-white/20 font-semibold gap-2">
                   <User className="size-4 text-orange-400" />
-                  <span className="max-w-[100px] truncate">{account.name}</span>
+                  <span className="max-w-[100px] truncate">{profile?.name ?? 'Swimmer'}</span>
                   {isPremium && (
                     <Badge className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] font-bold px-1.5 py-0">PRO</Badge>
                   )}
@@ -122,8 +113,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenuContent align="end" className="bg-slate-950 text-white border-white/10 w-56">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-bold leading-none text-white">{account.name}</p>
-                    <p className="text-xs leading-none text-slate-400">{account.email}</p>
+                    <p className="text-sm font-bold leading-none text-white">{profile?.name ?? 'Swimmer'}</p>
+                    <p className="text-xs leading-none text-slate-400">{user.email}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/10" />
@@ -139,8 +130,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-white/10" />
                 <DropdownMenuItem
-                  onClick={() => {
-                    logoutAccount();
+                  onClick={async () => {
+                    await signOut();
                     setIsAuthOpen(true);
                   }}
                   className="cursor-pointer text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2"

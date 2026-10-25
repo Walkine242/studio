@@ -4,17 +4,11 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { getUserId } from '@/lib/hooks/use-user-profile';
 
 export default function LandingPage() {
   const router = useRouter();
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
-
-  useEffect(() => {
-    // Ensure getUserId is only called on the client side after hydration.
-    getUserId();
-  }, []);
 
 
   useEffect(() => {

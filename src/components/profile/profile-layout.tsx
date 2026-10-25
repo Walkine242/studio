@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,6 +85,8 @@ import { Badge } from '../ui/badge';
 import { useAllTimePoints } from '@/lib/hooks/use-all-time-points';
 import { getAllRaceResults } from '@/lib/services/race-results-service';
 import { useWorkoutLogs } from '@/lib/hooks/use-workout-logs';
+import { getFollowing, getFollowers, followSwimmer, unfollowSwimmer, removeFollower, searchSwimmers, type SwimmerListItem } from '@/lib/friends';
+import { useAuth } from '@/lib/auth/auth-provider';
 import { AppleIcon } from '../icons/apple';
 import { FitbitIcon } from '../icons/fitbit';
 
@@ -113,13 +115,6 @@ type GoalFormData = z.infer<typeof goalSchema>;
 
 const strokes = ['Freestyle', 'Backstroke', 'Breaststroke', 'Butterfly', 'IM'];
 
-const allUsers = [
-    { id: 'user_2', name: 'Alex Johnson', country: 'USA' },
-    { id: 'user_3', name: 'Yuki Tanaka', country: 'JPN' },
-    { id: 'user_4', name: 'Fatima Al-Fahim', country: 'CAN' },
-    { id: 'user_5', name: 'Sven Eriksson', country: 'SWE' },
-    { id: 'user_6', name: 'Chloe Dubois', country: 'FRA' },
-];
 
 const AwardTrophy = ({ rank, type = 'standard' }: { rank: number, type?: 'standard' | 'platinum' }) => {
     if (type === 'platinum') {
@@ -765,41 +760,48 @@ function WorkoutLogsList({ userId }: { userId: string }) {
 
 function FriendsList({ profileData }: { profileData: UserProfileData }) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [following, setFollowing] = useState<string[]>([]);
-    const [followers, setFollowers] = useState<string[]>([]);
+    const [following, setFollowing] = useState<SwimmerListItem[]>([]);
+    const [followers, setFollowers] = useState<SwimmerListItem[]>([]);
+    const [myFollowing, setMyFollowing] = useState<string[]>([]);
+    const [searchResults, setSearchResults] = useState<SwimmerListItem[]>([]);
     const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
-    
-    const handleFollowToggle = (userId: string) => {
-        setLoadingStates(prev => ({ ...prev, [userId]: true }));
-        // Simulate API call
-        setTimeout(() => {
-            setFollowing(prev => 
-                prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-            );
-            setLoadingStates(prev => ({ ...prev, [userId]: false }));
-        }, 500);
-    };
+    const { user: authUser } = useAuth();
+    const me = authUser?.id ?? null;
 
-    const handleRemoveFollower = (userId: string) => {
-         setLoadingStates(prev => ({ ...prev, [userId]: true }));
-        // Simulate API call
-        setTimeout(() => {
-            setFollowers(prev => prev.filter(id => id !== userId));
-            setLoadingStates(prev => ({ ...prev, [userId]: false }));
-        }, 500);
-    }
+    const load = useCallback(async () => {
+        const [f1, f2, mine] = await Promise.all([
+            getFollowing(profileData.id),
+            getFollowers(profileData.id),
+            me ? getFollowing(me) : Promise.resolve([]),
+        ]);
+        setFollowing(f1);
+        setFollowers(f2);
+        setMyFollowing(mine.map(u => u.id));
+    }, [profileData.id, me]);
 
-    const searchResults = useMemo(() => {
-        if (!searchTerm) return [];
-        return allUsers.filter(user => 
-            user.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-            user.id !== profileData.id // Exclude self from search
-        );
+    useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        if (!searchTerm.trim()) { setSearchResults([]); return; }
+        const t = setTimeout(() => {
+            searchSwimmers(searchTerm).then(r => setSearchResults(r.filter(u => u.id !== profileData.id)));
+        }, 300);
+        return () => clearTimeout(t);
     }, [searchTerm, profileData.id]);
 
-    const renderUserList = (userIds: string[], type: 'following' | 'followers' | 'search') => {
-        let users = userIds.map(id => allUsers.find(u => u.id === id)).filter(Boolean) as typeof allUsers;
-        if(type === 'search') users = searchResults;
+    const withLoading = async (userId: string, fn: () => Promise<void>) => {
+        setLoadingStates(prev => ({ ...prev, [userId]: true }));
+        try { await fn(); await load(); } catch (e) { console.error(e); }
+        setLoadingStates(prev => ({ ...prev, [userId]: false }));
+    };
+
+    const handleFollowToggle = (userId: string) => withLoading(userId, () =>
+        myFollowing.includes(userId) ? unfollowSwimmer(userId) : followSwimmer(userId));
+
+    const handleRemoveFollower = (userId: string) => withLoading(userId, () => removeFollower(userId));
+
+    const renderUserList = (list: SwimmerListItem[], type: 'following' | 'followers' | 'search') => {
+        const users = type === 'search' ? searchResults : list;
 
         if (users.length === 0) {
             return <p className="text-muted-foreground text-center pt-4">
@@ -810,7 +812,7 @@ function FriendsList({ profileData }: { profileData: UserProfileData }) {
         return (
             <ul className="space-y-3 mt-4">
                 {users.map(user => {
-                    const isFollowing = following.includes(user.id);
+                    const isFollowing = myFollowing.includes(user.id);
                     const isLoading = loadingStates[user.id];
                     
                     return (
@@ -819,9 +821,9 @@ function FriendsList({ profileData }: { profileData: UserProfileData }) {
                                 {getCountryByCode(user.country) && <Image src={getCountryByCode(user.country)!.flag} alt={user.country} width={20} height={15} />}
                                 <span className="font-medium">{user.name}</span>
                             </Link>
-                            {profileData.isCurrentUser && user.id !== profileData.id && (
+                            {me && user.id !== me && (
                                 <div className="flex gap-2">
-                                    {type === 'followers' && !isFollowing && (
+                                    {type === 'followers' && profileData.isCurrentUser && (
                                          <Button size="sm" variant="destructive" onClick={() => handleRemoveFollower(user.id)} disabled={isLoading}>
                                             {isLoading ? <Loader2 className="animate-spin" /> : <Trash2 />}
                                         </Button>
@@ -844,7 +846,7 @@ function FriendsList({ profileData }: { profileData: UserProfileData }) {
                                             ) : (
                                                 <>
                                                     <UserPlus className="mr-2" />
-                                                    {followers.includes(user.id) ? 'Follow Back' : 'Follow'}
+                                                    {followers.some(f => f.id === user.id) ? 'Follow Back' : 'Follow'}
                                                 </>
                                             )
                                         )}
@@ -873,7 +875,7 @@ function FriendsList({ profileData }: { profileData: UserProfileData }) {
             )}
             
             {searchTerm ? (
-                renderUserList([], 'search')
+                renderUserList(searchResults, 'search')
             ) : (
                 <Tabs defaultValue="following" className="mt-4">
                     <TabsList className="grid w-full grid-cols-2">

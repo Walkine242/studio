@@ -44,7 +44,7 @@ import {
 import { leagues, getLeagueDateRange } from '@/config/leagues';
 import type { Meet } from '@/lib/types';
 import { subscribeToMeets, createMeet } from '@/lib/services/meet-service';
-import { getUserId } from '@/lib/hooks/use-user-profile';
+import { getSupabase } from '@/lib/supabase/client';
 import { Badge } from '@/components/ui/badge';
 
 import { CheckoutModal } from '@/components/checkout-modal';
@@ -56,7 +56,6 @@ const leagueIcons = {
   fall: <Leaf className="text-orange-400" />,
 };
 
-const OWNER_USER_ID = 'user_8r09vt3';
 
 export default function DualPage() {
   const [joinCode, setJoinCode] = useState<string>('');
@@ -65,9 +64,7 @@ export default function DualPage() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const { isPremium, setPremiumStatus } = usePremiumMember();
-  const currentUserId = getUserId();
-  const isAdmin = currentUserId === OWNER_USER_ID;
+  const { isPremium, isAdmin, refreshPremium } = usePremiumMember();
 
   const customRaceImage = PlaceHolderImages.find(img => img.id === 'dual-custom-race');
 
@@ -76,18 +73,19 @@ export default function DualPage() {
           setDynamicMeets(meets);
       });
 
-      // Handle Stripe Checkout return redirect
+      // Back from Stripe Checkout: the webhook activates the membership on our
+      // server, so just re-check status (it can take a few seconds to arrive).
       if (typeof window !== 'undefined' && window.location.search.includes('payment=success')) {
-        setPremiumStatus(true);
         toast({
-          title: 'Payment Successful! 🎉',
-          description: 'Thank you for subscribing! Your Dual Annual Membership ($20.00 USD/year) is now active.',
+          title: 'Payment Received! 🎉',
+          description: 'Activating your membership. This usually takes a few seconds.',
         });
         window.history.replaceState({}, document.title, window.location.pathname);
+        [2000, 5000, 10000].forEach((ms) => setTimeout(() => refreshPremium(), ms));
       }
 
       return () => unsubscribe();
-  }, [setPremiumStatus, toast]);
+  }, [refreshPremium, toast]);
 
   const allMeets = useMemo(() => {
       // Merge static config with dynamic ones from DB
@@ -116,9 +114,15 @@ export default function DualPage() {
     return Object.values(grouped).filter(g => g.meets.length > 0);
   }, [allMeets]);
 
-  const handleJoinParty = () => {
-    if (joinCode.trim()) {
-      router.push(`/dual/lobby/${joinCode.trim().toUpperCase()}`);
+  const handleJoinParty = async () => {
+    const code = joinCode.trim().toUpperCase();
+    if (code) {
+      const { data } = await getSupabase().from('parties').select('id, status').eq('code', code).maybeSingle();
+      if (!data) {
+        toast({ variant: 'destructive', title: 'Party Not Found', description: `No race lobby has the code ${code}.` });
+        return;
+      }
+      router.push(`/dual/lobby/${data.id}`);
     } else {
       toast({
         variant: 'destructive',

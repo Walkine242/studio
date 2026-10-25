@@ -1,36 +1,32 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useUserProfile } from '@/lib/hooks/use-user-profile';
 import { Loader2 } from 'lucide-react';
 import { ProfileLayout } from '@/components/profile/profile-layout';
 import type { UserProfileData } from '@/lib/types';
 import { usePremiumMember } from '@/lib/hooks/use-premium-member';
+import { useAuth } from '@/lib/auth/auth-provider';
+import { useToast } from '@/hooks/use-toast';
 
-
-const getUserId = () => {
-    if (typeof window !== 'undefined') {
-        let userId = localStorage.getItem('userId');
-        if (!userId) {
-            userId = 'user_' + Math.random().toString(36).substring(2, 9);
-            localStorage.setItem('userId', userId);
-        }
-        return userId;
-    }
-    return null;
-}
 
 export default function ProfilePage() {
     const { profile, updateUserProfile, isInitialized: isProfileInitialized } = useUserProfile();
     const { isPremium, isInitialized: isPremiumInitialized } = usePremiumMember();
+    const { user } = useAuth();
+    const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     
     const handleSave = async (newProfileData: { name: string; country: string }) => {
         setIsSaving(true);
-        await updateUserProfile(newProfileData);
+        try {
+            await updateUserProfile(newProfileData);
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Could Not Save Profile', description: error instanceof Error ? error.message : 'Please try again.' });
+        }
         setIsSaving(false);
     };
     
-    const isReady = isProfileInitialized && isPremiumInitialized && profile;
+    const isReady = isProfileInitialized && isPremiumInitialized && profile && user;
 
     if (!isReady) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -38,7 +34,7 @@ export default function ProfilePage() {
 
     const profileData: UserProfileData = {
         ...profile,
-        id: getUserId()!,
+        id: user!.id,
         isCurrentUser: true,
         isPremium: isPremium
     };

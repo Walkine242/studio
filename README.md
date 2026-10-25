@@ -1,33 +1,28 @@
 # Dual
 
-Dual is a modern swimming performance tracking and workout generator app built with Next.js 15, Tailwind CSS, and Genkit AI.
+Dual is a competitive swimming app: virtual swim meets, head-to-head duals, leaderboards, personal bests, goals, and an AI workout coach. Built with Next.js 15, Tailwind CSS, Supabase (database, login, live updates), Stripe (memberships) and Claude (AI workouts).
 
-## Getting Started
+## How it fits together
 
-### Local Development
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Set up environment variables in `.env.local`:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-3. Start dev server:
-   ```bash
-   npm run dev
-   ```
-4. Open [http://localhost:3000](http://localhost:3000) in your browser.
+| Piece | What it does |
+|---|---|
+| **Supabase Auth** | Email + password accounts. Passwords are hashed by Supabase, never stored in the browser. |
+| **Supabase Postgres** | All app data: profiles, race results, PBs, goals, workout logs, saved workouts, follows, meets, race lobbies, awards. Row-level security means each user can only change their own data. |
+| **Database functions** | Race logic that must not be fakeable (joining meets, qualification, submitting race times, finishing races, awards, leaderboard points) runs inside the database. See `supabase/migrations/`. |
+| **Supabase Realtime** | Lobbies update live as swimmers join, the race starts and finishes. |
+| **Stripe** | Checkout for monthly / annual / lifetime passes. Membership is switched on only by the Stripe webhook (`/api/stripe/webhook`), never by the browser. |
+| **Claude** | Coach Mikey's workouts and practice reviews (`src/ai/`). Runs on the server, signed-in users only. |
 
-## Deploying
+## Setup
 
-This app is host-agnostic and ready for deployment on **Vercel** or any Node.js hosting platform:
+See **[SETUP.md](SETUP.md)** for the step-by-step guide (Supabase project, environment variables, Stripe webhook, Vercel).
 
-### Deploy to Vercel
-1. Install Vercel CLI or link your repository in the Vercel Dashboard.
-2. Set the `GEMINI_API_KEY` environment variable in your Vercel project settings.
-3. Deploy with:
-   ```bash
-   npx vercel --prod
-   ```
+## Local development
 
+```bash
+npm install
+cp .env.example .env.local   # then fill in the values
+npm run dev
+```
+
+Open http://localhost:3000.
