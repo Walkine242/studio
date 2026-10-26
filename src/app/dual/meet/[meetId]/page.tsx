@@ -27,24 +27,17 @@ import { getDynamicMeets } from '@/lib/services/meet-service';
 import type { Meet } from '@/lib/types';
 import { usePremiumMember } from '@/lib/hooks/use-premium-member';
 import { CheckoutModal } from '@/components/checkout-modal';
+import { getSupabase } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/auth/auth-provider';
 
-const getUserId = () => {
-    if (typeof window !== 'undefined') {
-        let userId = localStorage.getItem('userId');
-        if (!userId) {
-            userId = 'user_' + Math.random().toString(36).substring(2, 9);
-            localStorage.setItem('userId', userId);
-        }
-        return userId;
-    }
-    return null;
-};
-
-// This is a MOCK function. In a real app, this would be a complex query.
+// Championship meets are open to swimmers who have raced in at least one Finals.
 const checkChampionshipQualification = async (userId: string): Promise<boolean> => {
-    // For demonstration, let's say only users with 'a' or 'b' in their ID qualify.
-    await new Promise(resolve => setTimeout(resolve, 500)); // simulate network delay
-    return userId.includes('a') || userId.includes('b');
+    const { count } = await getSupabase()
+        .from('race_results')
+        .select('id', { count: 'exact', head: true })
+        .eq('swimmer_id', userId)
+        .eq('round', 'Finals');
+    return (count ?? 0) > 0;
 };
 
 const EventCountdown = ({ meetDate, startTime }: { meetDate: string, startTime: string }) => {
@@ -89,15 +82,13 @@ export default function MeetPage({ params }: { params: Promise<{ meetId: string 
   const { isPremium } = usePremiumMember();
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isLoading, setIsLoading] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [qualifications, setQualifications] = useState<Record<string, boolean>>({});
   const [isChampionshipQualified, setIsChampionshipQualified] = useState<boolean | null>(null);
   const [meet, setMeet] = useState<Meet | null>(null);
   const [isMeetLoading, setIsMeetLoading] = useState(true);
 
-  useEffect(() => {
-    setUserId(getUserId());
-  }, []);
 
   useEffect(() => {
       async function fetchMeet() {
@@ -176,8 +167,8 @@ export default function MeetPage({ params }: { params: Promise<{ meetId: string 
     if (!isPremium) {
       setIsCheckoutOpen(true);
       toast({
-        title: 'Annual Membership Required ($20.00/yr)',
-        description: 'Public swim meets require an active Dual Annual Membership. Unlock to join!'
+        title: 'Membership Required',
+        description: 'Your free trial has ended. Choose a plan to keep racing in public meets.'
       });
       return;
     }
@@ -280,7 +271,7 @@ export default function MeetPage({ params }: { params: Promise<{ meetId: string 
         </p>
          {meet.isChampionship && (
             <CardDescription className="mt-2 text-base border-l-4 border-yellow-500 pl-4 py-2 bg-yellow-500/10">
-                This is a championship meet! Only the top swimmers are eligible to compete for major points and awards.
+                This is a championship meet! It is open to swimmers who have already raced in a Finals.
             </CardDescription>
         )}
       </div>

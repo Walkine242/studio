@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AppPagesLayout } from './app-pages-layout';
+import { AuthProvider } from '@/lib/auth/auth-provider';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://dualswim.app'),
@@ -17,7 +18,13 @@ export const metadata: Metadata = {
     siteName: 'Dual',
     images: [
       {
-        url: '/og-image.png',
+        url: '/Dual.png?v=2',
+        width: 1200,
+        height: 630,
+        alt: 'Dual — Competitive Swimming Platform',
+      },
+      {
+        url: '/og-image.png?v=2',
         width: 1200,
         height: 630,
         alt: 'Dual — Competitive Swimming Platform',
@@ -30,7 +37,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Dual — Competitive Swimming & Virtual Meets',
     description: 'Enter virtual swim meets, generate custom AI workouts, and track global leaderboards.',
-    images: ['/og-image.png'],
+    images: ['/Dual.png?v=2'],
   },
 };
 
@@ -50,8 +57,10 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <AppPagesLayout>{children}</AppPagesLayout>
-        <Toaster />
+        <AuthProvider>
+          <AppPagesLayout>{children}</AppPagesLayout>
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

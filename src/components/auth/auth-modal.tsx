@@ -17,57 +17,7 @@ import { UserCheck, Sparkles, LogIn, UserPlus, Lock, KeyRound } from 'lucide-rea
 import { countries } from '@/lib/countries';
 import { useToast } from '@/hooks/use-toast';
 
-export interface UserAccount {
-  userId: string;
-  name: string;
-  email: string;
-  country: string;
-  isLoggedIn: boolean;
-  isPremium?: boolean;
-}
-
-const ACCOUNT_STORAGE_KEY = 'dual_current_account';
-
-export function getCurrentAccount(): UserAccount | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(ACCOUNT_STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-export function saveCurrentAccount(account: UserAccount) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(account));
-  
-  // Sync legacy profile so header & profile pages update
-  localStorage.setItem('aquaSpeed-userProfile', JSON.stringify({
-    name: account.name,
-    country: account.country,
-  }));
-  localStorage.setItem('userId', account.userId);
-
-  // Restore premium status if previously upgraded under this email
-  if (account.email) {
-    const savedPremium = localStorage.getItem(`dual_is_premium_${account.email.toLowerCase()}`);
-    if (savedPremium === 'true') {
-      localStorage.setItem('dual-is-premium', 'true');
-    }
-  }
-
-  // Dispatch custom storage event for live reactive updates
-  window.dispatchEvent(new Event('storage'));
-}
-
-export function logoutAccount() {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(ACCOUNT_STORAGE_KEY);
-  localStorage.setItem('dual-is-premium', 'false');
-  window.dispatchEvent(new Event('storage'));
-}
+import { getSupabase } from '@/lib/supabase/client';
 
 interface AuthModalProps {
   open: boolean;
@@ -83,10 +33,19 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
   const [country, setCountry] = useState('USA');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const supabase = getSupabase();
 
-  const handleSignup = (e: React.FormEvent) => {
+  const finish = (title: string, description: string) => {
+    setPassword('');
+    setLoading(false);
+    onOpenChange(false);
+    toast({ title, description });
+    if (onSuccess) onSuccess();
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password.trim()) {
+    if (!name.trim() || !email.trim() || !password) {
       toast({
         variant: 'destructive',
         title: 'Missing Fields',
@@ -95,49 +54,48 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       toast({
         variant: 'destructive',
         title: 'Password Too Short',
-        description: 'Password must be at least 6 characters.',
+        description: 'Password must be at least 8 characters.',
       });
       return;
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const formattedEmail = email.trim().toLowerCase();
-      const userId = 'user_' + Math.random().toString(36).substring(2, 9);
-      const newAccount: UserAccount = {
-        userId,
-        name: name.trim(),
-        email: formattedEmail,
-        country,
-        isLoggedIn: true,
-      };
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: {
+        data: { name: name.trim(), country },
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+      },
+    });
 
-      // Save credentials for login validation
-      localStorage.setItem(`dual_user_creds_${formattedEmail}`, JSON.stringify({
-        ...newAccount,
-        password: password.trim(),
-      }));
-
-      saveCurrentAccount(newAccount);
+    if (error) {
       setLoading(false);
-      onOpenChange(false);
+      toast({ variant: 'destructive', title: 'Could Not Create Account', description: error.message });
+      return;
+    }
 
+    if (!data.session) {
+      // Email confirmation is on: the account exists but must be confirmed first.
+      setLoading(false);
+      setTab('login');
       toast({
-        title: 'Account Created! 🎉',
-        description: `Welcome to Dual, ${name.trim()}! Your profile is active.`,
+        title: 'Check Your Email 📬',
+        description: `We sent a confirmation link to ${email.trim()}. Click it, then log in.`,
       });
+      return;
+    }
 
-      if (onSuccess) onSuccess();
-    }, 600);
+    finish('Account Created! 🎉', `Welcome to Dual, ${name.trim()}!`);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) {
+    if (!email.trim() || !password) {
       toast({
         variant: 'destructive',
         title: 'Missing Fields',
@@ -147,71 +105,37 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const formattedEmail = email.trim().toLowerCase();
-      const storedCredsRaw = localStorage.getItem(`dual_user_creds_${formattedEmail}`);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
 
-      if (storedCredsRaw) {
-        try {
-          const storedCreds = JSON.parse(storedCredsRaw);
-          if (storedCreds.password !== password.trim()) {
-            setLoading(false);
-            toast({
-              variant: 'destructive',
-              title: 'Incorrect Password',
-              description: 'The password you entered is incorrect. Please try again.',
-            });
-            return;
-          }
-
-          const account: UserAccount = {
-            userId: storedCreds.userId || 'user_' + Math.random().toString(36).substring(2, 9),
-            name: storedCreds.name || formattedEmail.split('@')[0],
-            email: formattedEmail,
-            country: storedCreds.country || 'USA',
-            isLoggedIn: true,
-          };
-
-          saveCurrentAccount(account);
-          setLoading(false);
-          onOpenChange(false);
-
-          toast({
-            title: 'Welcome Back! 👋',
-            description: `Logged in as ${account.name}. Your profile and member benefits are active.`,
-          });
-
-          if (onSuccess) onSuccess();
-          return;
-        } catch {}
-      }
-
-      // If user logs in for the first time with new password
-      const userId = 'user_' + Math.random().toString(36).substring(2, 9);
-      const newAccount: UserAccount = {
-        userId,
-        name: name.trim() || formattedEmail.split('@')[0],
-        email: formattedEmail,
-        country: 'USA',
-        isLoggedIn: true,
-      };
-
-      localStorage.setItem(`dual_user_creds_${formattedEmail}`, JSON.stringify({
-        ...newAccount,
-        password: password.trim(),
-      }));
-
-      saveCurrentAccount(newAccount);
+    if (error) {
       setLoading(false);
-      onOpenChange(false);
-
       toast({
-        title: 'Logged In! 🎉',
-        description: `Welcome back, ${newAccount.name}!`,
+        variant: 'destructive',
+        title: 'Login Failed',
+        description: error.message === 'Invalid login credentials'
+          ? 'That email and password don\'t match an account.'
+          : error.message,
       });
+      return;
+    }
 
-      if (onSuccess) onSuccess();
-    }, 600);
+    finish('Welcome Back! 👋', 'You are logged in.');
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      toast({ variant: 'destructive', title: 'Enter Your Email', description: 'Type your email above first.' });
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+    });
+    toast(error
+      ? { variant: 'destructive', title: 'Could Not Send Email', description: error.message }
+      : { title: 'Reset Email Sent', description: 'Check your inbox for a link to choose a new password.' });
   };
 
   return (
@@ -277,7 +201,7 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
                   id="signup-password"
                   type="password"
                   placeholder="••••••••"
-                  minLength={6}
+                  minLength={8}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -353,6 +277,13 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
               >
                 {loading ? 'Logging in...' : 'Log In to Dual Swim'}
               </Button>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="w-full text-center text-xs text-slate-400 hover:text-white underline"
+              >
+                Forgot your password?
+              </button>
             </form>
           </TabsContent>
         </Tabs>

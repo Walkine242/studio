@@ -1,39 +1,43 @@
 'use client';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Home, Trophy, ArrowUp, ArrowDown, Award as AwardIcon } from 'lucide-react';
+import { Home, Trophy, Award as AwardIcon, Loader2, Swords } from 'lucide-react';
 import Link from 'next/link';
-import { countries } from '@/lib/countries';
 import Image from 'next/image';
+import { getCountryByCode, type Country } from '@/lib/countries';
+import { getParty, getPartyResults } from '@/lib/services/party-service';
+import type { Party } from '@/lib/types';
+import { formatTime } from '@/lib/utils';
+import { useAuth } from '@/lib/auth/auth-provider';
 
-const getCountry = (name: string) => {
-    // Simple logic to assign a country to a mock swimmer
-    const hash = name.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
-    return countries[Math.abs(hash) % countries.length];
-};
+const FINALS_POINTS = [9, 7, 6, 5, 4, 3, 2, 1];
 
-const mockResults = [
-  { name: 'You', rank: 1, points: 50, time: '01:58.23', country: getCountry('You') },
-  { name: 'Swimmer 2', rank: 2, points: 25, time: '02:01.45', country: getCountry('Swimmer 2') },
-  { name: 'Swimmer 3', rank: 3, points: -10, time: '02:05.11', country: getCountry('Swimmer 3') },
-  { name: 'Swimmer 4', rank: 4, points: -20, time: '02:10.98', country: getCountry('Swimmer 4') },
-  { name: 'Swimmer 5', rank: 5, points: -25, time: '02:12.34', country: getCountry('Swimmer 5') },
-  { name: 'Swimmer 6', rank: 6, points: -30, time: '02:15.67', country: getCountry('Swimmer 6') },
-  { name: 'Swimmer 7', rank: 7, points: -35, time: '02:18.90', country: getCountry('Swimmer 7') },
-  { name: 'Swimmer 8', rank: 8, points: -40, time: '02:22.22', country: getCountry('Swimmer 8') },
-];
+interface Standing {
+  id: string;
+  name: string;
+  rank: number;
+  points: number;
+  time: string;
+  country?: Country;
+}
 
+const CountryTag = ({ country }: { country?: Country }) =>
+  country ? (
+    <div className="flex items-center gap-2">
+      <Image src={country.flag} alt={country.name} width={20} height={15} />
+      <span className="text-sm">{country.code}</span>
+    </div>
+  ) : null;
 
-const Podium = ({ winners }: { winners: typeof mockResults}) => (
+const Podium = ({ winners }: { winners: Standing[] }) => (
     <div className="flex justify-center items-end gap-4 mt-8 h-64">
         {/* 2nd Place */}
         <div className="flex flex-col items-center w-1/4">
             <Trophy className="text-gray-400 size-10"/>
             <p className="font-bold">{winners[1].name}</p>
-            <div className="flex items-center gap-2">
-                <Image src={winners[1].country.flag} alt={winners[1].country.name} width={20} height={15} />
-                <span className="text-sm">{winners[1].country.code}</span>
-            </div>
+            <CountryTag country={winners[1].country} />
             <div className="bg-muted w-full rounded-t-lg text-center p-4 mt-2 h-24 flex items-center justify-center">
                 <span className="font-bold text-2xl">2</span>
             </div>
@@ -42,10 +46,7 @@ const Podium = ({ winners }: { winners: typeof mockResults}) => (
         <div className="flex flex-col items-center w-1/4">
             <Trophy className="text-yellow-500 size-14"/>
             <p className="font-bold">{winners[0].name}</p>
-             <div className="flex items-center gap-2">
-                <Image src={winners[0].country.flag} alt={winners[0].country.name} width={20} height={15} />
-                <span className="text-sm">{winners[0].country.code}</span>
-            </div>
+             <CountryTag country={winners[0].country} />
             <div className="bg-primary w-full rounded-t-lg text-center p-4 mt-2 h-36 flex items-center justify-center">
                 <span className="font-bold text-3xl text-primary-foreground">1</span>
             </div>
@@ -54,10 +55,7 @@ const Podium = ({ winners }: { winners: typeof mockResults}) => (
         <div className="flex flex-col items-center w-1/4">
              <Trophy className="text-orange-400 size-8"/>
              <p className="font-bold">{winners[2].name}</p>
-              <div className="flex items-center gap-2">
-                <Image src={winners[2].country.flag} alt={winners[2].country.name} width={20} height={15} />
-                <span className="text-sm">{winners[2].country.code}</span>
-            </div>
+              <CountryTag country={winners[2].country} />
              <div className="bg-muted w-full rounded-t-lg text-center p-4 mt-2 h-16 flex items-center justify-center">
                 <span className="font-bold text-xl">3</span>
             </div>
@@ -65,14 +63,64 @@ const Podium = ({ winners }: { winners: typeof mockResults}) => (
     </div>
 )
 
-export default function DualResultsPage() {
-  const topThree = mockResults.slice(0, 3);
+function ResultsView() {
+  const searchParams = useSearchParams();
+  const partyId = searchParams.get('party');
+  const [party, setParty] = useState<Party | null>(null);
+  const [standings, setStandings] = useState<Standing[] | null>(null);
+  const { user } = useAuth();
+  const me = user?.id;
+
+  useEffect(() => {
+    if (!partyId) return;
+    const unsubscribe = getParty(partyId, setParty);
+    getPartyResults(partyId)
+      .then((results) =>
+        setStandings(
+          results.map((r, index) => ({
+            id: r.swimmerId!,
+            name: r.swimmerName,
+            rank: index + 1,
+            points: FINALS_POINTS[index] ?? 0,
+            time: formatTime(r.totalTime),
+            country: r.country ? getCountryByCode(r.country) : undefined,
+          }))
+        )
+      )
+      .catch(() => setStandings([]));
+    return () => unsubscribe();
+  }, [partyId]);
+
+  if (!partyId) {
+    return (
+      <div className="container mx-auto max-w-xl text-center space-y-4 py-10">
+        <h1 className="text-2xl font-bold">No race selected</h1>
+        <p className="text-muted-foreground">Finish a dual to see its results here.</p>
+        <Button asChild><Link href="/dual"><Swords className="mr-2" /> Go to Dual Mode</Link></Button>
+      </div>
+    );
+  }
+
+  if (!standings || !party) {
+    return (
+      <div className="container mx-auto flex justify-center items-center h-64">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const countsForPoints = party.isPublic && party.round === 'Finals';
+
   return (
     <div className="container mx-auto max-w-4xl space-y-8">
       <div className="text-center">
         <AwardIcon className="mx-auto h-24 w-24 text-primary" />
-        <h1 className="mt-4 font-headline text-4xl font-bold">Race Finished!</h1>
-        <p className="mt-2 text-muted-foreground">Here are the final results and points awarded.</p>
+        <h1 className="mt-4 font-headline text-4xl font-bold">
+          {party.status === 'finished' ? 'Race Finished!' : 'Live Results'}
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          {party.event}{party.round && ` - ${party.round}`}
+        </p>
       </div>
 
       <style jsx>{`
@@ -100,58 +148,68 @@ export default function DualResultsPage() {
           animation-delay: 0.5s;
         }
       `}</style>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Finals Podium</CardTitle>
-          <CardDescription>Event: 200m Freestyle</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <Podium winners={topThree} />
-        </CardContent>
-      </Card>
-      
+
+      {standings.length >= 3 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Podium</CardTitle>
+            <CardDescription>Event: {party.event}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Podium winners={standings.slice(0, 3)} />
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Final Standings</CardTitle>
+          {countsForPoints && <CardDescription>Points count toward the All-Time Points leaderboard.</CardDescription>}
         </CardHeader>
         <CardContent className="space-y-4">
-          {mockResults.map((result, index) => (
+          {standings.length === 0 && (
+            <p className="text-center text-muted-foreground">No times were submitted for this race.</p>
+          )}
+          {standings.map((result, index) => (
             <div
-              key={index}
+              key={result.id}
               className="result-card flex items-center justify-between p-4 rounded-lg bg-muted"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <div className="flex items-center gap-4">
                 <span className="text-2xl font-bold w-8 text-center">{result.rank}</span>
                 <div>
-                  <p className="font-bold text-lg">{result.name}</p>
+                  <Link href={`/profile/${result.id}`} className="font-bold text-lg hover:underline">
+                    {result.name}{result.id === me && ' (You)'}
+                  </Link>
                   <p className="font-mono text-muted-foreground">{result.time}</p>
                 </div>
-                 <div className="flex items-center gap-2">
-                    <Image src={result.country.flag} alt={result.country.name} width={20} height={15} />
-                    <span className="text-sm text-muted-foreground">{result.country.code}</span>
+                <CountryTag country={result.country} />
+              </div>
+              {countsForPoints && result.points > 0 && (
+                <div className="flex items-center gap-1 text-xl font-bold points-gain">
+                  +{result.points}
+                  <span className="text-sm font-normal ml-1">pts</span>
                 </div>
-              </div>
-              <div
-                className={`flex items-center gap-1 text-xl font-bold ${
-                  result.points > 0 ? 'points-gain' : 'points-loss'
-                }`}
-              >
-                {result.points > 0 ? <ArrowUp className="size-5" /> : <ArrowDown className="size-5" />}
-                {result.points > 0 ? `+${result.points}` : result.points}
-                <span className="text-sm font-normal ml-1">pts</span>
-              </div>
+              )}
             </div>
           ))}
         </CardContent>
       </Card>
 
       <Button asChild className="w-full" size="lg">
-        <Link href="/">
+        <Link href="/dashboard">
           <Home className="mr-2" /> Back to Dashboard
         </Link>
       </Button>
     </div>
+  );
+}
+
+export default function DualResultsPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+      <ResultsView />
+    </Suspense>
   );
 }
