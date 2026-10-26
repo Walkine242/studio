@@ -7,12 +7,7 @@ import { getUserId as getCurrentUserId } from '@/lib/hooks/use-user-profile';
 
 const STORAGE_KEY = 'aquaSpeed-goals';
 
-const initialData: Goal[] = [
-    { id: '1', description: 'Swim 100m freestyle under 1:00', targetDate: new Date('2024-09-01').toISOString(), completed: false, type: 'custom', userId: 'user_zivts43' },
-    { id: '2', description: 'Complete a 3000m workout', targetDate: new Date('2024-08-15').toISOString(), completed: false, type: 'custom', userId: 'user_zivts43' },
-    { id: '3', description: 'Improve 50m butterfly time by 1s', targetDate: new Date('2024-10-01').toISOString(), completed: false, type: 'custom', userId: 'user_zivts43' },
-    { id: '4', description: 'Learn flip turns', targetDate: new Date('2023-05-20').toISOString(), completed: true, type: 'custom', userId: 'user_zivts43' },
-];
+const initialData: Goal[] = [];
 
 export function useGoals(userId?: string) {
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -26,11 +21,11 @@ export function useGoals(userId?: string) {
       if (targetUserId) {
         setGoals(allGoals.filter(g => g.userId === targetUserId));
       } else {
-        setGoals(initialData.filter(g => g.userId === 'user_zivts43'));
+        setGoals([]);
       }
     } catch (error) {
       console.error('Failed to load goals from localStorage', error);
-      setGoals(initialData.filter(g => g.userId === targetUserId));
+      setGoals([]);
     }
     setIsInitialized(true);
   }, [targetUserId]);

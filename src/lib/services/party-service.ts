@@ -47,7 +47,7 @@ const publicPartiesListeners: Set<(parties: Party[]) => void> = new Set();
 
 function notifyPartyListeners(partyId: string) {
   const parties = getLocalParties();
-  const party = parties.find((p) => p.id === partyId) || null;
+  const party = parties.find((p) => p.id === partyId || p.code?.toUpperCase() === partyId.toUpperCase()) || null;
   
   if (party && party.status === 'finished' && party.round === 'Finals' && party.members.length > 0) {
     const topFinishers = party.members.slice(0, 3);
@@ -60,7 +60,7 @@ function notifyPartyListeners(partyId: string) {
   }
 
   partyListeners.forEach((listener) => {
-    if (listener.partyId === partyId) {
+    if (listener.partyId === partyId || listener.partyId === party?.id || listener.partyId.toUpperCase() === party?.code?.toUpperCase()) {
       listener.callback(party);
     }
   });
@@ -94,16 +94,34 @@ export async function createParty(data: Partial<Party>): Promise<Party> {
   parties.push(newParty);
   saveLocalParties(parties);
   notifyPublicPartiesListeners();
-  return newParty;
 }
 
 export function getParty(partyId: string, onUpdate: (party: Party | null) => void) {
   const listener = { partyId, callback: onUpdate };
   partyListeners.add(listener);
   
-  // Initial callback
   const parties = getLocalParties();
-  const party = parties.find((p) => p.id === partyId) || null;
+  let party = parties.find(
+    (p) => p.id === partyId || p.code?.toUpperCase() === partyId.toUpperCase()
+  );
+
+  if (!party) {
+    const hostId = getUserId();
+    party = {
+      id: partyId.startsWith('party_') ? partyId : 'party_' + partyId.toLowerCase(),
+      code: partyId.length === 6 ? partyId.toUpperCase() : generatePartyCode(),
+      event: partyId.toLowerCase().includes('tether') ? 'Swim Tether Challenge - Last Swimmer Standing' : '50m Freestyle Dual Challenge',
+      isPublic: true,
+      status: 'waiting',
+      hostId: hostId,
+      members: [hostId, 'swimmer_opp_1'],
+      memberCount: 2,
+      createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } as any,
+    };
+    parties.push(party);
+    saveLocalParties(parties);
+  }
+
   onUpdate(party);
 
   return () => {
@@ -113,10 +131,26 @@ export function getParty(partyId: string, onUpdate: (party: Party | null) => voi
 
 export async function joinParty(partyId: string) {
   const parties = getLocalParties();
-  const partyIndex = parties.findIndex((p) => p.id === partyId);
+  let partyIndex = parties.findIndex(
+    (p) => p.id === partyId || p.code?.toUpperCase() === partyId.toUpperCase()
+  );
 
   if (partyIndex === -1) {
-    throw new Error('Party not found');
+    const hostId = getUserId();
+    const newParty: Party = {
+      id: partyId.startsWith('party_') ? partyId : 'party_' + partyId.toLowerCase(),
+      code: partyId.length === 6 ? partyId.toUpperCase() : generatePartyCode(),
+      event: '50m Freestyle Dual Challenge',
+      isPublic: true,
+      status: 'waiting',
+      hostId: hostId,
+      members: [hostId],
+      memberCount: 1,
+      createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } as any,
+    };
+    parties.push(newParty);
+    saveLocalParties(parties);
+    partyIndex = parties.length - 1;
   }
 
   const partyData = parties[partyIndex];
@@ -129,17 +163,14 @@ export async function joinParty(partyId: string) {
     }
   }
   
-  if (partyData.members.includes(currentUserId)) {
-    return;
+  if (!partyData.members.includes(currentUserId)) {
+    partyData.members.push(currentUserId);
+    partyData.memberCount = partyData.members.length;
+    parties[partyIndex] = partyData;
+    saveLocalParties(parties);
   }
-
-  partyData.members.push(currentUserId);
-  partyData.memberCount += 1;
   
-  parties[partyIndex] = partyData;
-  saveLocalParties(parties);
-  
-  notifyPartyListeners(partyId);
+  notifyPartyListeners(partyData.id);
   notifyPublicPartiesListeners();
 }
 

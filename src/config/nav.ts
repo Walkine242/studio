@@ -55,5 +55,4 @@ export const navItems: NavItemConfig[] = [
       { href: '/training/logs', label: 'Workout Logs', icon: History, type: 'link' },
     ]
   },
-  { href: '/premium', label: 'Premium', icon: Sparkles, type: 'link' },
 ];

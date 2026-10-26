@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { UserCheck, Sparkles, LogIn, UserPlus, Lock, KeyRound } from 'lucide-react';
 import { countries } from '@/lib/countries';
 import { useToast } from '@/hooks/use-toast';
+import { registerUser } from '@/lib/users';
 
 export interface UserAccount {
   userId: string;
@@ -43,6 +44,14 @@ export function saveCurrentAccount(account: UserAccount) {
   if (typeof window === 'undefined') return;
   localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(account));
   
+  // Register in user discovery list
+  registerUser({
+    id: account.userId,
+    name: account.name,
+    country: account.country,
+    email: account.email,
+  });
+
   // Sync legacy profile so header & profile pages update
   localStorage.setItem('aquaSpeed-userProfile', JSON.stringify({
     name: account.name,
@@ -104,10 +113,21 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
       return;
     }
 
+    const formattedEmail = email.trim().toLowerCase();
+    const existingCreds = typeof window !== 'undefined' ? localStorage.getItem(`dual_user_creds_${formattedEmail}`) : null;
+    if (existingCreds) {
+      toast({
+        variant: 'destructive',
+        title: 'Account Already Exists',
+        description: `An account with email "${formattedEmail}" is already registered. Please log in with your password.`,
+      });
+      setTab('login');
+      return;
+    }
+
     setLoading(true);
     setTimeout(() => {
-      const formattedEmail = email.trim().toLowerCase();
-      const userId = 'user_' + Math.random().toString(36).substring(2, 9);
+      const userId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       const newAccount: UserAccount = {
         userId,
         name: name.trim(),
@@ -123,6 +143,17 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
       }));
 
       saveCurrentAccount(newAccount);
+
+      // Trigger Welcome Email Notification
+      fetch('/api/email/welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: formattedEmail,
+        }),
+      }).catch((err) => console.error('Failed to dispatch welcome email:', err));
+
       setLoading(false);
       onOpenChange(false);
 
@@ -151,66 +182,54 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
       const formattedEmail = email.trim().toLowerCase();
       const storedCredsRaw = localStorage.getItem(`dual_user_creds_${formattedEmail}`);
 
-      if (storedCredsRaw) {
-        try {
-          const storedCreds = JSON.parse(storedCredsRaw);
-          if (storedCreds.password !== password.trim()) {
-            setLoading(false);
-            toast({
-              variant: 'destructive',
-              title: 'Incorrect Password',
-              description: 'The password you entered is incorrect. Please try again.',
-            });
-            return;
-          }
-
-          const account: UserAccount = {
-            userId: storedCreds.userId || 'user_' + Math.random().toString(36).substring(2, 9),
-            name: storedCreds.name || formattedEmail.split('@')[0],
-            email: formattedEmail,
-            country: storedCreds.country || 'USA',
-            isLoggedIn: true,
-          };
-
-          saveCurrentAccount(account);
-          setLoading(false);
-          onOpenChange(false);
-
-          toast({
-            title: 'Welcome Back! 👋',
-            description: `Logged in as ${account.name}. Your profile and member benefits are active.`,
-          });
-
-          if (onSuccess) onSuccess();
-          return;
-        } catch {}
+      if (!storedCredsRaw) {
+        setLoading(false);
+        toast({
+          variant: 'destructive',
+          title: 'No Account Found',
+          description: `No registered account found with email "${formattedEmail}". Please check your email or click Create Account.`,
+        });
+        return;
       }
 
-      // If user logs in for the first time with new password
-      const userId = 'user_' + Math.random().toString(36).substring(2, 9);
-      const newAccount: UserAccount = {
-        userId,
-        name: name.trim() || formattedEmail.split('@')[0],
-        email: formattedEmail,
-        country: 'USA',
-        isLoggedIn: true,
-      };
+      try {
+        const storedCreds = JSON.parse(storedCredsRaw);
+        if (storedCreds.password !== password.trim()) {
+          setLoading(false);
+          toast({
+            variant: 'destructive',
+            title: 'Incorrect Password',
+            description: 'The password you entered is incorrect. Please try again.',
+          });
+          return;
+        }
 
-      localStorage.setItem(`dual_user_creds_${formattedEmail}`, JSON.stringify({
-        ...newAccount,
-        password: password.trim(),
-      }));
+        const account: UserAccount = {
+          userId: storedCreds.userId || `user_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+          name: storedCreds.name || formattedEmail.split('@')[0],
+          email: formattedEmail,
+          country: storedCreds.country || 'USA',
+          isLoggedIn: true,
+        };
 
-      saveCurrentAccount(newAccount);
-      setLoading(false);
-      onOpenChange(false);
+        saveCurrentAccount(account);
+        setLoading(false);
+        onOpenChange(false);
 
-      toast({
-        title: 'Logged In! 🎉',
-        description: `Welcome back, ${newAccount.name}!`,
-      });
+        toast({
+          title: 'Welcome Back! 👋',
+          description: `Logged in as ${account.name}. Your profile is active.`,
+        });
 
-      if (onSuccess) onSuccess();
+        if (onSuccess) onSuccess();
+      } catch (err) {
+        setLoading(false);
+        toast({
+          variant: 'destructive',
+          title: 'Login Error',
+          description: 'Failed to authenticate account. Please try again.',
+        });
+      }
     }, 600);
   };
 

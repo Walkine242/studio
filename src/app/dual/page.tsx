@@ -181,11 +181,11 @@ export default function DualPage() {
         <div>
           <div className="relative mx-auto flex h-40 w-40 items-center justify-center">
             <Image
-              src="https://image2url.com/r2/bucket2/images/1766812844657-01919505-635c-4653-b6ae-cde82128ad7b.png"
+              src="/Dual.png?v=2"
               alt="DUAL Logo"
               width={144}
               height={144}
-              className="relative"
+              className="relative object-contain"
             />
           </div>
           <h1 className="mt-4 font-headline text-3xl font-bold text-white">Dual Mode</h1>
@@ -220,8 +220,7 @@ export default function DualPage() {
             <CardHeader>
               <CardTitle>Public Swim Meets</CardTitle>
               <CardDescription>
-                Join a scheduled public meet and compete in various events.
-                {!isPremium && <span className="font-bold text-accent"> (Premium Feature)</span>}
+                Join a scheduled public meet and compete in various events. Free for all swimmers!
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -236,7 +235,7 @@ export default function DualPage() {
                     </AccordionTrigger>
                     <AccordionContent className="space-y-4 pt-4">
                       {meets.map((meet) => (
-                        <Card key={meet.id} className={cn("transition-shadow", !isPremium && "opacity-70", isPremium && "hover:shadow-md")}>
+                        <Card key={meet.id} className="transition-shadow hover:shadow-md">
                             <CardHeader>
                                 <CardTitle className="flex items-center justify-between">
                                     <span>{meet.name}</span>
@@ -245,20 +244,11 @@ export default function DualPage() {
                                 <CardDescription>{format(new Date(meet.date), "EEEE, MMMM do, yyyy")}</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                {isPremium ? (
-                                  <Button asChild className="w-full">
-                                    <Link href={`/dual/meet/${meet.id}`}>
-                                        <Calendar className="mr-2" /> View Schedule & Join
-                                    </Link>
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    onClick={() => setIsCheckoutOpen(true)}
-                                    className="w-full min-h-[40px] h-auto py-2 px-2 text-xs sm:text-sm bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-center flex items-center justify-center"
-                                  >
-                                    <Lock className="mr-1.5 size-3.5 shrink-0" /> <span>Upgrade to Join ($20/yr)</span>
-                                  </Button>
-                                )}
+                              <Button asChild className="w-full">
+                                <Link href={`/dual/meet/${meet.id}`}>
+                                    <Calendar className="mr-2" /> View Schedule & Join
+                                </Link>
+                              </Button>
                             </CardContent>
                         </Card>
                       ))}
@@ -342,7 +332,6 @@ export default function DualPage() {
           </Card>
         </div>
       </div>
-      <CheckoutModal open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen} />
     </div>
   );
 }

@@ -9,15 +9,15 @@ import { countries } from '@/lib/countries';
 const getMockProfileData = (userId: string): UserProfileData => {
     const country = countries[Math.abs(userId.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0)) % countries.length];
     
-    // Mock premium status for some users
-    const isPremium = userId.includes('2') || userId.includes('5');
+    // All users have full free access
+    const isPremium = true;
 
     return {
         id: userId,
         name: `Swimmer ${userId.slice(5, 9)}`,
         country: country.code,
         isCurrentUser: false,
-        isPremium: isPremium,
+        isPremium: true,
     };
 };
 

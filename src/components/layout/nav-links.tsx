@@ -4,8 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { navItems } from '@/config/nav';
 import { cn } from '@/lib/utils';
-import { usePremiumMember } from '@/lib/hooks/use-premium-member';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,11 +14,10 @@ import { Button } from '@/components/ui/button';
 
 export function NavLinks() {
   const pathname = usePathname();
-  const { isPremium } = usePremiumMember();
 
   return (
     <>
-      {navItems.map((item, index) => {
+      {navItems.map((item) => {
         if (item.type === 'dropdown') {
           const isChildActive = item.items.some(child => pathname === child.href);
           return (
@@ -31,7 +28,7 @@ export function NavLinks() {
                   className={cn(
                     "flex items-center gap-1 transition-colors hover:text-white",
                     isChildActive ? "text-white" : "text-white/70",
-                    "focus-visible:ring-0 focus-visible:ring-offset-0" // remove ugly focus ring from dropdown trigger
+                    "focus-visible:ring-0 focus-visible:ring-offset-0"
                   )}
                 >
                   {item.label}
@@ -63,7 +60,6 @@ export function NavLinks() {
               >
                 <item.icon className="size-4" />
                 {item.label}
-                {item.href === '/premium' && isPremium && <Badge variant="secondary" className="ml-2">Active</Badge>}
               </Link>
            </Button>
         );
@@ -71,3 +67,4 @@ export function NavLinks() {
     </>
   );
 }
+

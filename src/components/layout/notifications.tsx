@@ -11,27 +11,22 @@ import type { Notification } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import Link from 'next/link';
-
-const NOTIFICATIONS_KEY = 'dual_user_notifications';
+import { getCurrentAccount } from '@/components/auth/auth-modal';
 
 export function getStoredNotifications(): Notification[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
+    const account = getCurrentAccount();
+    if (!account || !account.isLoggedIn || !account.userId) {
+      // Clean legacy shared notification key if present for visitor
+      localStorage.removeItem('dual_user_notifications');
+      return [];
+    }
+    const raw = localStorage.getItem(`dual_user_notifications_${account.userId}`);
     if (raw) return JSON.parse(raw);
   } catch {}
   
-  // Default clean welcome notification for new users
-  return [
-    {
-      id: 'welcome-1',
-      type: 'result_update',
-      from: { name: 'DUAL' },
-      content: 'Welcome to Dual! Enter virtual meets, generate AI workouts, and track leaderboards.',
-      timestamp: new Date().toISOString(),
-      read: false,
-    },
-  ];
+  return [];
 }
 
 const NotificationIcon = ({ type }: { type: Notification['type'] }) => {
@@ -56,16 +51,28 @@ export function Notifications({ newNotification }: { newNotification?: Notificat
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
-  useEffect(() => {
+  const refreshNotifications = () => {
     setNotifications(getStoredNotifications());
+  };
+
+  useEffect(() => {
+    refreshNotifications();
+    window.addEventListener('storage', refreshNotifications);
+    return () => window.removeEventListener('storage', refreshNotifications);
   }, []);
 
   useEffect(() => {
+    const account = getCurrentAccount();
+    if (!account || !account.isLoggedIn || !account.userId) {
+      setNotifications([]);
+      return;
+    }
+
     if (newNotification && !notifications.find(n => n.id === newNotification.id)) {
       const updated = [newNotification, ...notifications];
       setNotifications(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
+        localStorage.setItem(`dual_user_notifications_${account.userId}`, JSON.stringify(updated));
       }
     }
   }, [newNotification, notifications]);
@@ -74,11 +81,17 @@ export function Notifications({ newNotification }: { newNotification?: Notificat
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
+    const account = getCurrentAccount();
+    if (!account || !account.isLoggedIn || !account.userId) {
+      setNotifications([]);
+      return;
+    }
+
     if (!open && notifications.some(n => !n.read)) {
       const readAll = notifications.map(n => ({ ...n, read: true }));
       setNotifications(readAll);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(readAll));
+        localStorage.setItem(`dual_user_notifications_${account.userId}`, JSON.stringify(readAll));
       }
     }
   };

@@ -4,15 +4,14 @@ import type { AllTimeBest } from '@/lib/types';
 import { getAllRaceResults } from '@/lib/services/race-results-service';
 import { useUserProfile } from './use-user-profile';
 
-const MOCK_USER_NAMES: Record<string, string> = {
-    "user_zivts43": "Swimmer Zivts",
-    "user_2": "Alex Johnson",
-    "user_3": "Yuki Tanaka",
-    "user_4": "Fatima Al-Fahim",
-    "user_5": "Sven Eriksson",
-    "user_6": "Chloe Dubois",
+import { getRegisteredUsers } from '@/lib/users';
+
+const getSwimmerName = (id: string) => {
+  const registered = getRegisteredUsers();
+  const user = registered.find(u => u.id === id);
+  if (user) return user.name;
+  return 'Swimmer';
 };
-const getSwimmerName = (id: string) => MOCK_USER_NAMES[id] || id.replace('_', ' ');
 
 
 export function useAllTimeBestByEvent() {

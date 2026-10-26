@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { countries, Country, getCountryByCode } from '@/lib/countries';
+import { getRegisteredUsers, type RegisteredUser } from '@/lib/users';
 import { 
     Loader2, 
     User, 
@@ -42,6 +43,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { UserProfileData, PersonalBest, Goal, RaceResult } from '@/lib/types';
 import { cn, formatTime, formatSwimTime, swimTimeToMs, convertSwimTimeStr } from '@/lib/utils';
+import { createParty } from '@/lib/services/party-service';
+import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -87,6 +90,13 @@ import { getAllRaceResults } from '@/lib/services/race-results-service';
 import { useWorkoutLogs } from '@/lib/hooks/use-workout-logs';
 import { AppleIcon } from '../icons/apple';
 import { FitbitIcon } from '../icons/fitbit';
+import {
+  useConnectedDevices,
+  DEVICE_METADATA,
+  type ConnectedDeviceKey,
+} from '@/lib/hooks/use-connected-devices';
+import { ConnectDeviceModal } from '@/components/connect-device-modal';
+import { Bluetooth, Radio, Battery, Wifi, CheckCircle2, Unlink, RefreshCw, Zap } from 'lucide-react';
 
 const pbSchema = z.object({
   stroke: z.string().min(1, 'Stroke is required.'),
@@ -112,14 +122,6 @@ const goalSchema = z.object({
 type GoalFormData = z.infer<typeof goalSchema>;
 
 const strokes = ['Freestyle', 'Backstroke', 'Breaststroke', 'Butterfly', 'IM'];
-
-const allUsers = [
-    { id: 'user_2', name: 'Alex Johnson', country: 'USA' },
-    { id: 'user_3', name: 'Yuki Tanaka', country: 'JPN' },
-    { id: 'user_4', name: 'Fatima Al-Fahim', country: 'CAN' },
-    { id: 'user_5', name: 'Sven Eriksson', country: 'SWE' },
-    { id: 'user_6', name: 'Chloe Dubois', country: 'FRA' },
-];
 
 const AwardTrophy = ({ rank, type = 'standard' }: { rank: number, type?: 'standard' | 'platinum' }) => {
     if (type === 'platinum') {
@@ -768,6 +770,14 @@ function FriendsList({ profileData }: { profileData: UserProfileData }) {
     const [following, setFollowing] = useState<string[]>([]);
     const [followers, setFollowers] = useState<string[]>([]);
     const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
+    const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([]);
+
+    useEffect(() => {
+        setRegisteredUsers(getRegisteredUsers());
+        const handleStorage = () => setRegisteredUsers(getRegisteredUsers());
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
+    }, []);
     
     const handleFollowToggle = (userId: string) => {
         setLoadingStates(prev => ({ ...prev, [userId]: true }));
@@ -791,14 +801,14 @@ function FriendsList({ profileData }: { profileData: UserProfileData }) {
 
     const searchResults = useMemo(() => {
         if (!searchTerm) return [];
-        return allUsers.filter(user => 
+        return registeredUsers.filter(user => 
             user.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
             user.id !== profileData.id // Exclude self from search
         );
-    }, [searchTerm, profileData.id]);
+    }, [searchTerm, profileData.id, registeredUsers]);
 
     const renderUserList = (userIds: string[], type: 'following' | 'followers' | 'search') => {
-        let users = userIds.map(id => allUsers.find(u => u.id === id)).filter(Boolean) as typeof allUsers;
+        let users = userIds.map(id => registeredUsers.find(u => u.id === id)).filter(Boolean) as RegisteredUser[];
         if(type === 'search') users = searchResults;
 
         if (users.length === 0) {
@@ -1379,6 +1389,7 @@ export function ProfileLayout({ profileData, isLoading, onProfileSave }: Profile
     const [dualEvent, setDualEvent] = useState('');
     const [dualUnit, setDualUnit] = useState<Unit>('meters');
     const { toast } = useToast();
+    const router = useRouter();
     const searchParams = useSearchParams();
     const defaultTab = searchParams.get('tab') || 'overview';
 
@@ -1397,7 +1408,7 @@ export function ProfileLayout({ profileData, isLoading, onProfileSave }: Profile
         }
     };
     
-    const handleRequestDual = () => {
+    const handleRequestDual = async () => {
         if (!dualEvent) {
             toast({
                 variant: 'destructive',
@@ -1407,12 +1418,28 @@ export function ProfileLayout({ profileData, isLoading, onProfileSave }: Profile
             return;
         }
 
-        toast({
-            title: 'Dual Requested!',
-            description: `A challenge for ${dualEvent} has been sent to ${profileData.name}. They have 24 hours to accept.`,
-        });
-        setIsDualDialogOpen(false);
-        setDualEvent('');
+        try {
+            const unitStr = dualUnit === 'meters' ? 'm' : 'yd';
+            const party = await createParty({
+                event: `${dualEvent} (${unitStr})`,
+                isPublic: false,
+            });
+
+            toast({
+                title: 'Dual Challenge Created!',
+                description: `Created dual challenge for ${dualEvent}. Redirecting to lobby...`,
+            });
+            setIsDualDialogOpen(false);
+            setDualEvent('');
+            router.push(`/dual/lobby/${party.id}`);
+        } catch (e) {
+            console.error(e);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not create dual challenge.',
+            });
+        }
     }
     
     const swimEvents = dualUnit === 'meters' ? METER_EVENTS : YARD_EVENTS;
@@ -1494,6 +1521,7 @@ export function ProfileLayout({ profileData, isLoading, onProfileSave }: Profile
                     <TabsTrigger value="simulator">Goal Simulator</TabsTrigger>
                     <TabsTrigger value="race_history">Race History</TabsTrigger>
                     <TabsTrigger value="workout_logs">Workout Logs</TabsTrigger>
+                    <TabsTrigger value="wearables">Wearables & Devices</TabsTrigger>
                     <TabsTrigger value="friends">Friends</TabsTrigger>
                 </TabsList>
 
@@ -1581,6 +1609,10 @@ export function ProfileLayout({ profileData, isLoading, onProfileSave }: Profile
                 <TabsContent value="workout_logs" className="mt-6">
                     <WorkoutLogsList userId={profileData.id} />
                 </TabsContent>
+
+                <TabsContent value="wearables" className="mt-6">
+                    <WearableDevicesManager />
+                </TabsContent>
                 
                 <TabsContent value="friends" className="mt-6">
                     <Card>
@@ -1597,3 +1629,190 @@ export function ProfileLayout({ profileData, isLoading, onProfileSave }: Profile
         </div>
     );
 }
+
+function WearableDevicesManager() {
+  const {
+    devices,
+    getConnectedList,
+    testDeviceConnection,
+    disconnectDevice,
+    isBleSupported,
+  } = useConnectedDevices();
+  const { toast } = useToast();
+  const [selectedDevice, setSelectedDevice] = useState<ConnectedDeviceKey | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const connectedList = getConnectedList();
+  const deviceKeys: ConnectedDeviceKey[] = [
+    'garmin',
+    'apple-watch',
+    'form-goggles',
+    'fitbit',
+    'polar',
+    'suunto',
+    'coros',
+  ];
+
+  const handlePair = (key: ConnectedDeviceKey) => {
+    setSelectedDevice(key);
+    setIsModalOpen(true);
+  };
+
+  const handleTest = (key: ConnectedDeviceKey) => {
+    const res = testDeviceConnection(key);
+    const meta = DEVICE_METADATA[key];
+    toast({
+      title: `${meta.name} Telemetry Pinged! ⚡`,
+      description: `Live HR: ${res?.liveHeartRate || 142} bpm • Battery: ${res?.batteryLevel || 85}%.`,
+    });
+  };
+
+  const handleDisconnect = (key: ConnectedDeviceKey) => {
+    disconnectDevice(key);
+    const meta = DEVICE_METADATA[key];
+    toast({
+      title: `${meta.name} Disconnected`,
+      description: `Device removed from active telemetry stream.`,
+    });
+  };
+
+  return (
+    <Card className="bg-slate-950/80 text-white border-slate-800 shadow-xl">
+      <CardHeader>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-xl text-white">
+              <Watch className="size-6 text-cyan-400" /> Wearables & Swim Devices
+            </CardTitle>
+            <CardDescription className="text-slate-400 text-xs mt-1">
+              Connect your smartwatch, smart goggles, or heart rate sensors via Bluetooth LE or Cloud APIs to automatically capture split times and swim metrics.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="border-slate-700 text-slate-300 text-xs px-3 py-1">
+              {connectedList.length} / 7 Paired
+            </Badge>
+            {isBleSupported && (
+              <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30 text-xs px-3 py-1 flex items-center gap-1">
+                <Bluetooth className="size-3" /> Web BLE Active
+              </Badge>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {deviceKeys.map((key) => {
+            const meta = DEVICE_METADATA[key];
+            const info = devices[key];
+            const isConnected = info?.connected ?? false;
+
+            return (
+              <div
+                key={key}
+                className={`p-4 rounded-xl border transition-all ${
+                  isConnected
+                    ? 'bg-slate-900/90 border-cyan-500/40 shadow-lg shadow-cyan-950/20'
+                    : 'bg-slate-900/40 border-slate-800/80 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 shrink-0">
+                      {meta.iconType === 'apple' ? (
+                        <AppleIcon className="size-6 text-slate-100" />
+                      ) : meta.iconType === 'fitbit' ? (
+                        <FitbitIcon className="size-6 text-sky-400" />
+                      ) : meta.iconType === 'goggles' ? (
+                        <Watch className="size-6 text-cyan-400" />
+                      ) : (
+                        <Watch className="size-6 text-emerald-400" />
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                        {meta.name}
+                      </h4>
+                      <p className="text-[11px] text-slate-400">{meta.brand} Integration</p>
+                    </div>
+                  </div>
+
+                  {isConnected ? (
+                    <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px] flex items-center gap-1">
+                      <CheckCircle2 className="size-3" /> Active
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-slate-800 text-slate-500 text-[10px]">
+                      Not Paired
+                    </Badge>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-400 mt-3 line-clamp-2">{meta.description}</p>
+
+                {isConnected ? (
+                  <div className="mt-4 pt-3 border-t border-slate-800/80 space-y-2 text-xs">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500">Account / ID:</span>
+                      <span className="font-mono text-cyan-300 truncate max-w-[160px]">{info.accountId}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500">Hardware / Protocol:</span>
+                      <span className="text-slate-300">
+                        {info.connectionType === 'bluetooth-le' ? 'Bluetooth LE' : 'Cloud API OAuth'}
+                      </span>
+                    </div>
+                    {info.batteryLevel && (
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500">Battery Level:</span>
+                        <span className="font-mono text-emerald-400 font-bold flex items-center gap-1">
+                          <Battery className="size-3 text-emerald-400" /> {info.batteryLevel}%
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 pt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleTest(key)}
+                        className="flex-1 border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/60 font-semibold text-xs h-8"
+                      >
+                        <RefreshCw className="size-3 mr-1.5" /> Ping Test
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDisconnect(key)}
+                        className="border-red-500/30 text-red-400 hover:bg-red-950/40 font-semibold text-xs h-8 px-2.5"
+                      >
+                        <Unlink className="size-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 pt-3 border-t border-slate-800/80">
+                    <Button
+                      size="sm"
+                      onClick={() => handlePair(key)}
+                      className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold text-xs h-8"
+                    >
+                      <Bluetooth className="size-3.5 mr-1.5" /> Pair & Connect Device
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+
+      <ConnectDeviceModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        deviceKey={selectedDevice}
+      />
+    </Card>
+  );
+}
+

@@ -7,11 +7,7 @@ import { swimTimeToMs } from '@/lib/utils';
 
 const STORAGE_KEY = 'aquaSpeed-personalBests';
 
-const initialData: PersonalBest[] = [
-  { id: '1', stroke: 'Freestyle', distance: 50, unit: 'meters', time: '00:23.50', date: new Date('2023-08-15').toISOString(), userId: 'user_zivts43' },
-  { id: '2', stroke: 'Freestyle', distance: 100, unit: 'meters', time: '00:52.10', date: new Date('2023-09-01').toISOString(), userId: 'user_zivts43' },
-  { id: '3', stroke: 'Butterfly', distance: 50, unit: 'meters', time: '00:25.80', date: new Date('2023-07-20').toISOString(), userId: 'user_zivts43' },
-];
+const initialData: PersonalBest[] = [];
 
 
 export function usePersonalBests(userId?: string) {
@@ -40,7 +36,7 @@ export function usePersonalBests(userId?: string) {
       if (targetUserId) {
         setPersonalBests(getDeduplicatedPBs(allPBs, targetUserId));
       } else {
-        setPersonalBests(getDeduplicatedPBs(initialData, 'user_zivts43'))
+        setPersonalBests([]);
       }
     } catch (error) {
       console.error('Failed to load personal bests from localStorage', error);

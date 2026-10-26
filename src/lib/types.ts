@@ -31,9 +31,15 @@ export interface RaceResult {
   laps: number[];
   event: string;
   swimmerId?: string; // To associate result with a swimmer
+  swimmerName?: string;
   country?: string; // To filter by country
   meetId?: string;
   round?: string;
+  source?: string; // e.g. 'apple-watch' | 'form-goggles' | 'garmin' | 'fitbit' | 'polar' | 'suunto' | 'coros'
+  formattedTime?: string;
+  heartRate?: number;
+  strokeRate?: number;
+  partyId?: string;
 }
 
 export interface AllTimeBest {

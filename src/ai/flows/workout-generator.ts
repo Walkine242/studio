@@ -98,7 +98,7 @@ const WorkoutAnalysisInputSchema = z.object({
   avgPace: z.string().describe('The swimmer\'s actual average swim pace recorded (e.g. 1:28 per 100m).'),
   duration: z.string().describe('The duration of the workout completed.'),
   laps: z.number().describe('The number of laps completed.'),
-  avgHeartRate: z.number().describe('The average heart rate in BPM.'),
+  avgHeartRate: z.number().optional().describe('The average heart rate in BPM, if a sensor was connected.'),
   strokeFocus: z.string().describe('The focus stroke of the workout.'),
   splits: z.array(z.string()).describe('Detailed lap split times.'),
 });
@@ -115,13 +115,13 @@ const analysisPrompt = ai.definePrompt({
   name: 'workoutAnalysisPrompt',
   input: {schema: WorkoutAnalysisInputSchema},
   output: {schema: WorkoutAnalysisOutputSchema},
-  prompt: `You are Coach Mikey, an expert swim coach. Analyze this swimmer's performance data and provide constructive, detailed feedback. Compare their target pace with their actual average pace, comment on their heart rate management during the session, analyze their lap splits consistency, and give 2-3 specific recommendations for their technique.
+  prompt: `You are Coach Mikey, an expert swim coach. Analyze this swimmer's performance data and provide constructive, detailed feedback. Compare their target pace with their actual average pace, comment on their heart rate management during the session (or note if no sensor was connected), analyze their lap splits consistency, and give 2-3 specific recommendations for their technique.
 
   Target Pace: {{{targetPace}}}
   Actual Avg Pace: {{{avgPace}}}
   Duration: {{{duration}}}
   Laps Completed: {{{laps}}}
-  Avg Heart Rate: {{{avgHeartRate}}} BPM
+  Avg Heart Rate: {{#if avgHeartRate}}{{{avgHeartRate}}} BPM{{else}}No Heart Rate Sensor Connected{{/if}}
   Stroke Focus: {{{strokeFocus}}}
   Splits: {{{splits}}}
 
