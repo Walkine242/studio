@@ -89,6 +89,7 @@ import { getAllRaceResults } from '@/lib/services/race-results-service';
 import { useWorkoutLogs } from '@/lib/hooks/use-workout-logs';
 import { getFollowing, getFollowers, followSwimmer, unfollowSwimmer, removeFollower, searchSwimmers, type SwimmerListItem } from '@/lib/friends';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { AvatarCustomizer } from '@/components/avatar/avatar-customizer';
 import { AppleIcon } from '../icons/apple';
 import { FitbitIcon } from '../icons/fitbit';
 import {
@@ -1517,6 +1518,7 @@ export function ProfileLayout({ profileData, isLoading, onProfileSave }: Profile
             <Tabs defaultValue={defaultTab}>
                 <TabsList className="flex-wrap h-auto gap-2">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
+                    {profileData.isCurrentUser && <TabsTrigger value="avatar">My Avatar</TabsTrigger>}
                     <TabsTrigger value="pbs">Personal Bests</TabsTrigger>
                     <TabsTrigger value="goals">Goals</TabsTrigger>
                     <TabsTrigger value="simulator">Goal Simulator</TabsTrigger>
@@ -1582,6 +1584,12 @@ export function ProfileLayout({ profileData, isLoading, onProfileSave }: Profile
                     </div>
                 </TabsContent>
                 
+                {profileData.isCurrentUser && (
+                    <TabsContent value="avatar" className="mt-6">
+                        <AvatarCustomizer />
+                    </TabsContent>
+                )}
+
                 <TabsContent value="pbs" className="mt-6">
                     <PersonalBestsList 
                         isCurrentUser={profileData.isCurrentUser}

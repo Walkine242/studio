@@ -22,6 +22,8 @@ import { FitbitIcon } from '@/components/icons/fitbit';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { formatTime, swimTimeToMs } from '@/lib/utils';
+import Link from 'next/link';
+import { LobbyPoolScene } from '@/components/avatar/lobby-pool-scene';
 
 type TimingMethod = 'wearable' | 'timer';
 
@@ -188,12 +190,22 @@ export default function LobbyPage({ params }: { params: Promise<{ partyId: strin
 
   return (
     <div className="container mx-auto max-w-4xl space-y-8">
-      <div className="text-center">
-        <h1 className="mt-4 font-headline text-3xl font-bold">Dual Lobby</h1>
-        <p className="mt-2 text-muted-foreground">
+      <div className="space-y-2 pt-4">
+        <LobbyPoolScene
+          swimmers={members}
+          currentUserId={user.id}
+          hostId={party.hostId}
+          waiting={party.status === 'waiting'}
+          lanes={party.isPublic ? 8 : 4}
+          title={party.status === 'waiting' ? (members.length > 1 && isHost ? 'Swimmers ready' : 'Waiting for swimmers') : 'Race in progress'}
+          subtitle={`${party.event}${party.round ? ` · ${party.round}` : ''} · ${members.length} ${members.length === 1 ? 'swimmer' : 'swimmers'} on deck`}
+        />
+        <p className="text-center text-sm text-muted-foreground">
           {party.status === 'waiting'
             ? isHost ? 'Start the race when everyone is in.' : 'Waiting for the host to start the race...'
             : 'Race in progress. Submit your time when you touch the wall.'}
+          {' '}
+          <Link href="/profile?tab=avatar" className="underline hover:text-foreground">Customize your swimmer</Link>
         </p>
       </div>
 
@@ -318,6 +330,7 @@ export default function LobbyPage({ params }: { params: Promise<{ partyId: strin
         </Card>
       )}
 
+      {party.status === 'in-progress' && (
       <Card>
         <CardHeader>
           <CardTitle>Swimmers ({party.memberCount})</CardTitle>
@@ -340,6 +353,7 @@ export default function LobbyPage({ params }: { params: Promise<{ partyId: strin
           </ul>
         </CardContent>
       </Card>
+      )}
 
       {isHost && party.status === 'waiting' && (
         <Button

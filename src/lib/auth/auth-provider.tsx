@@ -11,6 +11,8 @@ export interface Profile {
   name: string;
   country: string;
   isAdmin: boolean;
+  /** Saved avatar colours (see lib/avatar.ts); null until the swimmer customises it. */
+  avatar: unknown;
 }
 
 export interface Membership {
@@ -32,6 +34,7 @@ interface AuthState {
   refreshProfile: () => Promise<void>;
   refreshPremium: () => Promise<void>;
   updateProfile: (data: { name: string; country: string }) => Promise<void>;
+  updateAvatar: (look: Record<string, string>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -52,8 +55,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadProfile = useCallback(async (uid: string) => {
-    const { data } = await supabase.from('profiles').select('name, country, is_admin').eq('id', uid).maybeSingle();
-    setProfile(data ? { name: data.name, country: data.country, isAdmin: data.is_admin } : null);
+    // select('*') keeps working before the avatar migration has been run.
+    const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+    setProfile(data ? { name: data.name, country: data.country, isAdmin: data.is_admin, avatar: data.avatar ?? null } : null);
   }, [supabase]);
 
   const loadPremium = useCallback(async (_uid: string) => {
@@ -121,6 +125,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateProfile: async ({ name, country }) => {
       if (!user) throw new Error('You must be logged in.');
       const { error } = await supabase.from('profiles').update({ name: name.trim(), country }).eq('id', user.id);
+      if (error) throw error;
+      await loadProfile(user.id);
+    },
+    updateAvatar: async (look) => {
+      if (!user) throw new Error('You must be logged in.');
+      const { error } = await supabase.from('profiles').update({ avatar: look }).eq('id', user.id);
       if (error) throw error;
       await loadProfile(user.id);
     },

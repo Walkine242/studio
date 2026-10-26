@@ -48,7 +48,7 @@ async function fetchParty(partyId: string): Promise<Party | null> {
     supabase.from('parties').select('*').eq('id', partyId).maybeSingle(),
     supabase
       .from('party_members')
-      .select('user_id, joined_at, profiles(name, country)')
+      .select('user_id, joined_at, profiles(*)')
       .eq('party_id', partyId)
       .order('joined_at'),
   ]);
@@ -57,6 +57,7 @@ async function fetchParty(partyId: string): Promise<Party | null> {
     id: m.user_id,
     name: m.profiles?.name ?? 'Swimmer',
     country: m.profiles?.country ?? '',
+    avatar: m.profiles?.avatar ?? null,
   }));
   return mapParty(party, summaries);
 }

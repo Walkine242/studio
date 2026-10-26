@@ -156,5 +156,6 @@ export interface SwimmerSummary {
   id: string;
   name: string;
   country: string;
+  avatar?: unknown;
 }
 
