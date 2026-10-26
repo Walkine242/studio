@@ -19,7 +19,7 @@ function mapLog(row: any): WorkoutLog {
   };
 }
 
-export function useWorkoutLogs({ userId }: { userId?: string }) {
+export function useWorkoutLogs({ userId }: { userId?: string } = {}) {
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const { user } = useAuth();
@@ -46,7 +46,12 @@ export function useWorkoutLogs({ userId }: { userId?: string }) {
     load();
   }, [load]);
 
-  return { workoutLogs, isInitialized, refetch: load };
+  const addLog = useCallback(async (log: Omit<WorkoutLog, 'id' | 'userId'>) => {
+    await addWorkoutLog(log);
+    await load();
+  }, [load]);
+
+  return { workoutLogs, isInitialized, addWorkoutLog: addLog, refetch: load };
 }
 
 /** Records a completed session for the signed-in swimmer. */

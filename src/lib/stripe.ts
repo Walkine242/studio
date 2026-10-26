@@ -1,11 +1,13 @@
 import Stripe from 'stripe';
+import { STRIPE_PLANS } from '@/config/stripe-plans';
 
 export type PlanId = 'monthly' | 'annual' | 'lifetime';
 
-export const PLANS: Record<PlanId, { name: string; amountCents: number; recurring: 'month' | 'year' | null }> = {
-  monthly: { name: 'Dual Monthly Pass', amountCents: 399, recurring: 'month' },
-  annual: { name: 'Dual Annual Membership', amountCents: 2000, recurring: 'year' },
-  lifetime: { name: 'Dual Lifetime Founder Pass', amountCents: 9900, recurring: null },
+/** Plans used by checkout, built from the shared plan list in config/stripe-plans.ts. */
+export const PLANS: Record<PlanId, { name: string; description: string; amountCents: number; recurring: 'month' | 'year' | null; stripePriceId?: string }> = {
+  monthly: { ...STRIPE_PLANS.monthly, recurring: 'month' },
+  annual: { ...STRIPE_PLANS.annual, recurring: 'year' },
+  lifetime: { ...STRIPE_PLANS.lifetime, recurring: null },
 };
 
 export function getStripeInstance() {

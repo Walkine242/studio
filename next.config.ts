@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
     },
     webVitalsAttribution: ['CLS', 'LCP'],
     typedRoutes: false,
+    cpus: 1,
+  },
+  webpack: (config) => {
+    config.parallelism = 1;
+    return config;
   },
   images: {
     remotePatterns: [

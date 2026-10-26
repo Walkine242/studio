@@ -7,6 +7,7 @@ About 30 minutes. You'll need accounts on Supabase, Anthropic, Stripe and Vercel
 1. Go to https://supabase.com, create a new project (free tier is fine). Save the database password somewhere safe.
 2. In the project, open **SQL Editor → New query**.
 3. Paste the entire contents of `supabase/migrations/20261025000000_init.sql` and click **Run**. It should finish with "Success".
+   Then open a new query, paste `supabase/migrations/20261026000000_trial_and_welcome.sql` and **Run** it too (free trial + welcome email). To change the trial length, edit `interval '14 days'` in that file before running it.
 4. Open **Project Settings → API** and copy:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon` `public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -44,7 +45,11 @@ where id = (select id from auth.users where email = 'you@example.com');
 
 Test with card `4242 4242 4242 4242`, any future date, any CVC. After paying you should land back on Dual Mode and see "PRO" in the header within a few seconds. If you don't, check **Developers → Webhooks → your endpoint** in Stripe for failed deliveries.
 
-## 4. Vercel
+## 4. Welcome emails (optional)
+
+The app sends a welcome email on each swimmer's first login using Resend. Create a key at https://resend.com, verify the `dualswim.app` domain there, and add `RESEND_API_KEY` to Vercel. Without it, everything else works; the email is just skipped.
+
+## 5. Vercel
 
 1. In your Vercel project → **Settings → Environment Variables**, add every variable from `.env.example` (Production and Preview).
 2. Remove the old `GEMINI_API_KEY` variable; it's no longer used.

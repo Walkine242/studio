@@ -185,11 +185,11 @@ export default function DualPage() {
         <div>
           <div className="relative mx-auto flex h-40 w-40 items-center justify-center">
             <Image
-              src="https://image2url.com/r2/bucket2/images/1766812844657-01919505-635c-4653-b6ae-cde82128ad7b.png"
+              src="/Dual.png?v=2"
               alt="DUAL Logo"
               width={144}
               height={144}
-              className="relative"
+              className="relative object-contain"
             />
           </div>
           <h1 className="mt-4 font-headline text-3xl font-bold text-white">Dual Mode</h1>
@@ -260,7 +260,7 @@ export default function DualPage() {
                                     onClick={() => setIsCheckoutOpen(true)}
                                     className="w-full min-h-[40px] h-auto py-2 px-2 text-xs sm:text-sm bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-center flex items-center justify-center"
                                   >
-                                    <Lock className="mr-1.5 size-3.5 shrink-0" /> <span>Upgrade to Join ($20/yr)</span>
+                                    <Lock className="mr-1.5 size-3.5 shrink-0" /> <span>Choose a Plan to Join</span>
                                   </Button>
                                 )}
                             </CardContent>

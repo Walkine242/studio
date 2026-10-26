@@ -13,10 +13,20 @@ export interface Profile {
   isAdmin: boolean;
 }
 
+export interface Membership {
+  isPremium: boolean;
+  onTrial: boolean;
+  trialEndsAt: string | null;
+  plan: string | null;
+  status: string | null;
+  currentPeriodEnd: string | null;
+}
+
 interface AuthState {
   user: AuthUser | null;
   profile: Profile | null;
   isPremium: boolean;
+  membership: Membership | null;
   /** True until the first session check finishes. */
   isLoading: boolean;
   refreshProfile: () => Promise<void>;
@@ -37,7 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = getSupabase();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [isPremium, setIsPremium] = useState(false);
+  const [membership, setMembership] = useState<Membership | null>(null);
+  const isPremium = membership?.isPremium ?? false;
   const [isLoading, setIsLoading] = useState(true);
 
   const loadProfile = useCallback(async (uid: string) => {
@@ -45,9 +56,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(data ? { name: data.name, country: data.country, isAdmin: data.is_admin } : null);
   }, [supabase]);
 
-  const loadPremium = useCallback(async (uid: string) => {
-    const { data, error } = await supabase.rpc('is_premium', { uid });
-    setIsPremium(!error && data === true);
+  const loadPremium = useCallback(async (_uid: string) => {
+    const { data, error } = await supabase.rpc('membership_status');
+    const row = !error && Array.isArray(data) ? data[0] : null;
+    setMembership(row ? {
+      isPremium: row.is_premium === true,
+      onTrial: row.on_trial === true,
+      trialEndsAt: row.trial_ends_at,
+      plan: row.plan,
+      status: row.status,
+      currentPeriodEnd: row.current_period_end,
+    } : null);
   }, [supabase]);
 
   const applySession = useCallback(async (sessionUser: { id: string; email?: string | null } | null) => {
@@ -55,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       currentUserId = null;
       setUser(null);
       setProfile(null);
-      setIsPremium(false);
+      setMembership(null);
       return;
     }
     currentUserId = sessionUser.id;
@@ -73,6 +92,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        // First login after sign-up: the server sends the welcome email once.
+        setTimeout(() => {
+          fetch('/api/email/welcome', { method: 'POST' }).catch(() => {});
+        }, 0);
+      }
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
         // Defer so we never call Supabase inside the auth callback itself.
         setTimeout(() => applySession(session?.user ?? null), 0);
@@ -89,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     profile,
     isPremium,
+    membership,
     isLoading,
     refreshProfile: async () => { if (user) await loadProfile(user.id); },
     refreshPremium: async () => { if (user) await loadPremium(user.id); },
@@ -102,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await supabase.auth.signOut();
       await applySession(null);
     },
-  }), [user, profile, isPremium, isLoading, supabase, loadProfile, loadPremium, applySession]);
+  }), [user, profile, isPremium, membership, isLoading, supabase, loadProfile, loadPremium, applySession]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

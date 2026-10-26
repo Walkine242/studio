@@ -32,29 +32,41 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .maybeSingle();
 
+    // Swimmers still in their free trial aren't charged until it ends.
+    const { data: profile } = await getAdminSupabase()
+      .from('profiles')
+      .select('trial_ends_at')
+      .eq('id', user.id)
+      .maybeSingle();
+    const trialEnd = profile?.trial_ends_at ? Math.floor(new Date(profile.trial_ends_at).getTime() / 1000) : 0;
+    // Stripe requires a trial end at least 48 hours away.
+    const keepTrial = plan.recurring && trialEnd > Math.floor(Date.now() / 1000) + 49 * 3600;
+
     const session = await stripe.checkout.sessions.create({
       mode: plan.recurring ? 'subscription' : 'payment',
       client_reference_id: user.id,
       metadata: { user_id: user.id, plan: planId },
       ...(plan.recurring
-        ? { subscription_data: { metadata: { user_id: user.id, plan: planId } } }
+        ? { subscription_data: { metadata: { user_id: user.id, plan: planId }, ...(keepTrial ? { trial_end: trialEnd } : {}) } }
         : { payment_intent_data: { metadata: { user_id: user.id, plan: planId } } }),
       ...(existing?.stripe_customer_id
         ? { customer: existing.stripe_customer_id }
         : { customer_email: user.email ?? undefined }),
       line_items: [
-        {
+        plan.stripePriceId
+          ? { price: plan.stripePriceId, quantity: 1 }
+          : {
           price_data: {
             currency: 'usd',
             product_data: {
               name: plan.name,
-              description: 'Access to public swim meets, AI workout generator, head-to-head dual battles, and global leaderboards.',
+              description: plan.description,
             },
             unit_amount: plan.amountCents,
             ...(plan.recurring ? { recurring: { interval: plan.recurring } } : {}),
           },
           quantity: 1,
-        },
+        } as any,
       ],
       success_url: `${origin}/dual?payment=success`,
       cancel_url: `${origin}/premium?payment=cancelled`,

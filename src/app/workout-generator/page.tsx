@@ -70,8 +70,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { getFriends, type Friend } from '@/lib/friends';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { saveWorkout, getSavedWorkouts, deleteSavedWorkout, type SavedWorkout } from '@/lib/services/workout-service';
-import { addWorkoutLog } from '@/lib/hooks/use-workout-logs';
+import { useWorkoutLogs } from '@/lib/hooks/use-workout-logs';
 import Image from 'next/image';
+import {
+  useConnectedDevices,
+  DEVICE_METADATA,
+  type ConnectedDeviceKey,
+} from '@/lib/hooks/use-connected-devices';
+import { ConnectDeviceModal } from '@/components/connect-device-modal';
+import { Badge } from '@/components/ui/badge';
+import { Bluetooth, CheckCircle2, Wifi, AlertCircle, X } from 'lucide-react';
 
 const EQUIPMENT_OPTIONS = [
   'Buoy',
@@ -115,6 +123,7 @@ export default function WorkoutGeneratorPage() {
   const [activeTab, setActiveTab] = useState<string>('generator');
   const [selectedHistoryWorkout, setSelectedHistoryWorkout] = useState<SavedWorkout | null>(null);
   const { toast } = useToast();
+  const { addWorkoutLog } = useWorkoutLogs();
   const workoutRef = useRef<HTMLDivElement>(null);
 
   // Practice Mode states
@@ -131,6 +140,17 @@ export default function WorkoutGeneratorPage() {
 
   const [friends, setFriends] = useState<Friend[]>([]);
   useEffect(() => { getFriends().then(setFriends); }, []);
+  // Wearable Device Connection Integration
+  const { devices, getConnectedList } = useConnectedDevices();
+  const [modalDeviceKey, setModalDeviceKey] = useState<ConnectedDeviceKey | null>(null);
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+
+  const connectedKeys = getConnectedList();
+  const hasConnectedDevice = connectedKeys.length > 0;
+  const activeDeviceKey = hasConnectedDevice ? connectedKeys[0] : null;
+  const activeDeviceInfo = activeDeviceKey ? devices[activeDeviceKey] : null;
+  const activeDeviceMeta = activeDeviceKey ? DEVICE_METADATA[activeDeviceKey] : null;
+
 
   const form = useForm<WorkoutFormData>({
     resolver: zodResolver(workoutSchema),
@@ -343,9 +363,10 @@ export default function WorkoutGeneratorPage() {
     // Save the session to the swimmer's workout log.
     try {
       await addWorkoutLog({
+        title: `AI Practice Set: ${values.targetStroke && values.targetStroke !== 'N/A' ? values.targetStroke : 'Freestyle'} (${values.intensity || 'Endurance'})`,
         date: new Date().toISOString().slice(0, 10),
-        title: `${values.intensity ? values.intensity.replace(/\b\w/g, (c) => c.toUpperCase()) : 'Practice'} Session`,
-        source: 'manual',
+        location: hasConnectedDevice && activeDeviceMeta ? `${activeDeviceMeta.name} Session` : 'Pool Practice (Manual Timer)',
+        source: activeDeviceKey || 'manual',
         duration: formatTime(secondsElapsed),
         distance: values.typicalDistance || '',
         avgPace: avgPaceStr === 'N/A' ? '' : `${avgPaceStr}/lap`,
@@ -392,25 +413,66 @@ export default function WorkoutGeneratorPage() {
         {isPracticeMode && (
           <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6 text-white overflow-y-auto">
             
-            {/* Step 1: Device Syncing Animation */}
+            {/* Step 1: Device Syncing Screen */}
             {practiceStep === 'syncing' && (
-              <div className="flex flex-col items-center gap-6 max-w-md text-center">
-                <div className="relative size-28 rounded-full border-4 border-dashed border-blue-500 animate-spin flex items-center justify-center">
-                  <Smartphone className="size-12 text-blue-400 absolute animate-bounce" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Synchronizing Swim Set</h2>
-                  <p className="text-gray-400 mt-2 text-sm">
-                    Connecting to your Apple Watch / Garmin device via Bluetooth...
-                  </p>
-                </div>
-                <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/10">
-                  <div 
-                    className="bg-gradient-to-r from-blue-500 to-orange-500 h-full transition-all duration-300"
-                    style={{ width: `${syncProgress}%` }}
-                  />
-                </div>
-                <span className="text-xs text-gray-500">{syncProgress}% Synced</span>
+              <div className="flex flex-col items-center gap-6 max-w-md text-center bg-slate-900/80 p-8 rounded-2xl border border-slate-800 shadow-2xl">
+                {hasConnectedDevice ? (
+                  <>
+                    <div className="relative size-28 rounded-full border-4 border-dashed border-cyan-400 animate-spin flex items-center justify-center">
+                      <Smartphone className="size-12 text-cyan-400 absolute animate-bounce" />
+                    </div>
+                    <div>
+                      <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 text-xs mb-2">
+                        {activeDeviceInfo?.connectionType === 'bluetooth-le' ? 'Bluetooth LE Stream' : 'Cloud API Telemetry'}
+                      </Badge>
+                      <h2 className="text-2xl font-bold text-white">Synchronizing Swim Set</h2>
+                      <p className="text-slate-300 mt-2 text-sm">
+                        Authorizing real-time session telemetry stream from <strong>{activeDeviceMeta?.name}</strong>...
+                      </p>
+                    </div>
+                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
+                      <div 
+                        className="bg-gradient-to-r from-cyan-400 to-blue-500 h-full transition-all duration-300"
+                        style={{ width: `${syncProgress}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono">{syncProgress}% Telemetry Stream Ready</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-4 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                      <Clock className="size-12" />
+                    </div>
+                    <div className="space-y-1">
+                      <Badge variant="outline" className="border-amber-500/40 text-amber-300 text-xs">
+                        Manual Stopwatch Mode
+                      </Badge>
+                      <h2 className="text-xl font-bold text-white">No Swim Sensor Connected</h2>
+                      <p className="text-slate-400 text-xs">
+                        No wearable heart rate sensor or smartwatch is paired. Practice will run in manual stopwatch mode without real-time heart rate telemetry.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col w-full gap-2 pt-2">
+                      <Button
+                        onClick={() => {
+                          setModalDeviceKey(null);
+                          setIsConnectModalOpen(true);
+                        }}
+                        className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold text-xs h-10 shadow-lg"
+                      >
+                        <Bluetooth className="mr-2 size-4" /> Connect Wearable Swim Sensor
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setPracticeStep('active')}
+                        className="w-full border-slate-700 text-slate-300 hover:bg-slate-800 font-semibold text-xs h-10"
+                      >
+                        <Play className="mr-2 size-4 text-emerald-400" /> Start Manual Stopwatch Practice
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -422,9 +484,24 @@ export default function WorkoutGeneratorPage() {
                     <Activity className="size-6 text-orange-500 animate-pulse" />
                     <h2 className="text-xl font-bold uppercase tracking-widest text-orange-400">Dual Live HUD</h2>
                   </div>
-                  <span className="bg-blue-600 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
-                    {activePracticeSet}
-                  </span>
+
+                  <div className="flex items-center gap-3">
+                    {hasConnectedDevice ? (
+                      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/40 text-xs flex items-center gap-1.5 px-3 py-1">
+                        <CheckCircle2 className="size-3.5 text-emerald-400" />
+                        <span>Synced with {activeDeviceMeta?.name}</span>
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-amber-500/40 text-amber-300 text-xs flex items-center gap-1.5 px-3 py-1">
+                        <Clock className="size-3.5 text-amber-400" />
+                        <span>Manual Stopwatch Mode (No HR Sensor)</span>
+                      </Badge>
+                    )}
+
+                    <span className="bg-blue-600 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
+                      {activePracticeSet}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid gap-8 md:grid-cols-12 items-stretch">
@@ -447,21 +524,35 @@ export default function WorkoutGeneratorPage() {
                         <div className="mt-1 text-blue-400">Completed Laps: <strong className="text-lg">{recordedLaps}</strong></div>
                       </div>
                     </div>
-                    
+
+                    {!hasConnectedDevice && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setModalDeviceKey(null);
+                          setIsConnectModalOpen(true);
+                        }}
+                        className="mt-4 border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/60 font-semibold text-xs h-8"
+                      >
+                        <Bluetooth className="size-3.5 mr-1.5" /> Pair Heart Rate Monitor
+                      </Button>
+                    )}
+
                     {/* Device HUD Controls */}
-                    <div className="flex gap-4 mt-6">
+                    <div className="flex gap-3 mt-6">
                       <Button 
                         variant="outline" 
                         onClick={() => setIsPaused(!isPaused)} 
-                        className="border-white/20 bg-white/5 hover:bg-white/15 text-white"
+                        className="border-white/20 bg-white/5 hover:bg-white/15 text-white text-xs h-9"
                       >
-                        {isPaused ? <Play className="mr-2 size-4" /> : <Pause className="mr-2 size-4" />}
+                        {isPaused ? <Play className="mr-1.5 size-3.5" /> : <Pause className="mr-1.5 size-3.5" />}
                         {isPaused ? 'Resume' : 'Pause'}
                       </Button>
-                      <Button onClick={recordLap} className="bg-blue-600 hover:bg-blue-700 text-white font-bold">
+                      <Button onClick={recordLap} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-9">
                         Lap Split
                       </Button>
-                      <Button onClick={finishPractice} className="bg-red-600 hover:bg-red-700 text-white font-bold">
+                      <Button onClick={finishPractice} className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs h-9">
                         Finish Workout
                       </Button>
                     </div>
@@ -536,8 +627,11 @@ export default function WorkoutGeneratorPage() {
                   <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-center">
                     <span className="text-xs uppercase text-gray-400 font-bold block mb-1">Est. Calories</span>
                     <strong className="text-2xl font-mono text-orange-400 flex items-center justify-center gap-1">
-                      <Flame className="size-4 fill-current" /> {Math.round((secondsElapsed * 0.15))} kcal
+                      <Flame className="size-4 fill-current" /> {Math.round((secondsElapsed * (hasConnectedDevice ? 0.16 : 0.12)))} kcal
                     </strong>
+                    <span className="text-[10px] text-gray-400 font-medium block mt-0.5">
+                      {hasConnectedDevice ? 'From Telemetry' : 'Manual Estimate'}
+                    </span>
                   </div>
                 </div>
 
@@ -1077,6 +1171,11 @@ export default function WorkoutGeneratorPage() {
           )}
         </TabsContent>
       </div>
+      <ConnectDeviceModal
+        open={isConnectModalOpen}
+        onOpenChange={setIsConnectModalOpen}
+        deviceKey={modalDeviceKey}
+      />
     </Tabs>
   );
 }

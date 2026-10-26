@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-
-const STREAK_KEY = 'aquaSpeed-loginStreak';
+import { useAuth } from '@/lib/auth/auth-provider';
 
 interface StreakData {
   currentStreak: number;
@@ -24,43 +23,60 @@ const isYesterday = (date1: Date, date2: Date) => {
 export function useLoginStreak(): { streak: number, isNewStreak: boolean } {
     const [streak, setStreak] = useState(0);
     const [isNewStreak, setIsNewStreak] = useState(false);
+    const { user } = useAuth();
+    const userId = user?.id ?? null;
 
     useEffect(() => {
-        try {
-            const storedData = localStorage.getItem(STREAK_KEY);
-            const today = new Date();
-            const todayStr = today.toISOString().split('T')[0];
-
-            let streakData: StreakData;
-
-            if (storedData) {
-                streakData = JSON.parse(storedData);
-                const lastLoginDate = new Date(streakData.lastLogin);
-                
-                if (!isSameDay(today, lastLoginDate)) {
-                    if (isYesterday(today, lastLoginDate)) {
-                        // Streak continues
-                        streakData.currentStreak += 1;
-                    } else {
-                        // Streak broken
-                        streakData.currentStreak = 1;
+        const checkStreak = () => {
+            try {
+                // Clear any legacy global streak key for non-logged-in visitors
+                if (!userId) {
+                    if (typeof window !== 'undefined') {
+                        localStorage.removeItem('aquaSpeed-loginStreak');
                     }
-                    streakData.lastLogin = todayStr;
-                    localStorage.setItem(STREAK_KEY, JSON.stringify(streakData));
+                    setStreak(0);
+                    setIsNewStreak(false);
+                    return;
+                }
+
+                const streakKey = `aquaSpeed-loginStreak_${userId}`;
+                const storedData = localStorage.getItem(streakKey);
+                const today = new Date();
+                const todayStr = today.toISOString().split('T')[0];
+
+                let streakData: StreakData;
+
+                if (storedData) {
+                    streakData = JSON.parse(storedData);
+                    const lastLoginDate = new Date(streakData.lastLogin);
+                    
+                    if (!isSameDay(today, lastLoginDate)) {
+                        if (isYesterday(today, lastLoginDate)) {
+                            // Streak continues
+                            streakData.currentStreak += 1;
+                        } else {
+                            // Streak broken
+                            streakData.currentStreak = 1;
+                        }
+                        streakData.lastLogin = todayStr;
+                        localStorage.setItem(streakKey, JSON.stringify(streakData));
+                        setIsNewStreak(true);
+                    }
+                } else {
+                    // First login for authenticated user
+                    streakData = { currentStreak: 1, lastLogin: todayStr };
+                    localStorage.setItem(streakKey, JSON.stringify(streakData));
                     setIsNewStreak(true);
                 }
-            } else {
-                // First login
-                streakData = { currentStreak: 1, lastLogin: todayStr };
-                localStorage.setItem(STREAK_KEY, JSON.stringify(streakData));
-                setIsNewStreak(true);
-            }
-            setStreak(streakData.currentStreak);
+                setStreak(streakData.currentStreak);
 
-        } catch (error) {
-            console.error('Failed to process login streak:', error);
-        }
-    }, []);
+            } catch (error) {
+                console.error('Failed to process login streak:', error);
+            }
+        };
+
+        checkStreak();
+    }, [userId]);
 
     // Only report a new streak once
     useEffect(() => {
@@ -72,3 +88,4 @@ export function useLoginStreak(): { streak: number, isNewStreak: boolean } {
 
     return { streak, isNewStreak };
 }
+

@@ -28,6 +28,16 @@ function mapParty(row: any, members: SwimmerSummary[]): Party {
   };
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Accepts a party id or its 6-letter code (e.g. from a shared link) and returns the id. */
+export async function resolvePartyId(idOrCode: string): Promise<string | null> {
+  const value = decodeURIComponent(idOrCode).trim();
+  if (UUID_RE.test(value)) return value;
+  const { data } = await getSupabase().from('parties').select('id').eq('code', value.toUpperCase()).maybeSingle();
+  return data?.id ?? null;
+}
+
 function rpcError(error: { message: string } | null): never | void {
   if (error) throw new Error(error.message);
 }

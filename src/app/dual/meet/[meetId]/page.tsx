@@ -167,8 +167,8 @@ export default function MeetPage({ params }: { params: Promise<{ meetId: string 
     if (!isPremium) {
       setIsCheckoutOpen(true);
       toast({
-        title: 'Annual Membership Required ($20.00/yr)',
-        description: 'Public swim meets require an active Dual Annual Membership. Unlock to join!'
+        title: 'Membership Required',
+        description: 'Your free trial has ended. Choose a plan to keep racing in public meets.'
       });
       return;
     }

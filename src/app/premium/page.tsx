@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, Lock, Sparkles, Trophy, Users, Dumbbell, Zap, ShieldCheck } from 'lucide-react';
 import { usePremiumMember } from '@/lib/hooks/use-premium-member';
+import { useAuth } from '@/lib/auth/auth-provider';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Link from 'next/link';
@@ -89,7 +90,9 @@ const pricingPlans = [
 ];
 
 export default function PremiumPage() {
-  const { isPremium } = usePremiumMember();
+  const { isPremium, onTrial, trialDaysLeft, isInitialized } = usePremiumMember();
+  const { user } = useAuth();
+  const hasPaidPlan = isPremium && !onTrial;
   const { toast } = useToast();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
@@ -177,7 +180,32 @@ export default function PremiumPage() {
           <p className="text-slate-300">Secure checkout by Stripe. Your membership activates as soon as payment clears.</p>
         </div>
 
-        {isPremium ? (
+        {onTrial && (
+          <Card className="bg-cyan-950/40 border-cyan-500/30 text-white backdrop-blur-md">
+            <CardHeader>
+              <CardTitle className="text-xl text-cyan-300 flex items-center gap-2">
+                <Sparkles className="size-6 text-cyan-300" />
+                Free trial: {trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'} left
+              </CardTitle>
+              <CardDescription className="text-cyan-100">
+                You have full access to every feature during your trial. Love it? Pick a plan below. Monthly and annual
+                plans aren't charged until your trial ends, so you keep your free days.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+        {user && isInitialized && !isPremium && (
+          <Card className="bg-orange-950/40 border-orange-500/30 text-white backdrop-blur-md">
+            <CardHeader>
+              <CardTitle className="text-xl text-orange-300">Your free trial has ended</CardTitle>
+              <CardDescription className="text-orange-100">
+                Choose a plan to keep racing in meets, generating AI workouts and dueling swimmers worldwide.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+
+        {hasPaidPlan ? (
           <Card className="bg-emerald-950/40 border-emerald-500/30 text-white backdrop-blur-md">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>

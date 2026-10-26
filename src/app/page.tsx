@@ -45,11 +45,11 @@ export default function LandingPage() {
       <div className="relative z-10 flex flex-col items-center justify-center text-white w-full">
         <div className="flex h-[500px] w-[500px] items-center justify-center">
             <img
-            src="https://image2url.com/r2/bucket2/images/1766812844657-01919505-635c-4653-b6ae-cde82128ad7b.png"
+            src="/Dual.png?v=2"
             alt="DUAL Logo"
             width={500}
             height={500}
-            className="relative"
+            className="relative object-contain max-w-[85vw] max-h-[50vh]"
             />
         </div>
 

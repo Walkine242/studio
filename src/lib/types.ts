@@ -35,6 +35,11 @@ export interface RaceResult {
   meetId?: string;
   round?: string;
   swimmerName?: string;
+  source?: string; // e.g. 'apple-watch' | 'form-goggles' | 'garmin' | 'fitbit' | 'polar' | 'suunto' | 'coros' | 'manual'
+  formattedTime?: string;
+  heartRate?: number;
+  strokeRate?: number;
+  partyId?: string;
 }
 
 export interface AllTimeBest {
