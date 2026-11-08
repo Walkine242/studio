@@ -44,7 +44,7 @@ function Player({ swimmer, side, isYou, isHost }: { swimmer: VersusSwimmer; side
   return (
     <div className={`vs-player ${side}`}>
       <div className="vs-tag">{side === 'left' ? 'P1' : 'P2'}{isHost ? ' 👑' : ''}</div>
-      <TeamLogoBadge className="vs-logo" logo={team.logo} abbr={team.abbr} size={132} title={`${team.name} logo`} />
+      <TeamLogoBadge className="vs-logo" logo={team.logo} abbr={team.abbr} size={156} title={`${team.name} logo`} />
       <div className="vs-name" title={swimmer.name}>{swimmer.name}</div>
       <div className="vs-team">
         <Flag code={swimmer.country} />
@@ -119,7 +119,7 @@ export function VersusScreen({ swimmers, currentUserId, hostId, event, status }:
         ) : (
           <div className="vs-player right">
             <div className="vs-tag">P2</div>
-            <TeamLogoBadge ghost className="vs-logo" logo={defaultLogo('open')} abbr="" size={132} />
+            <TeamLogoBadge ghost className="vs-logo" logo={defaultLogo('open')} abbr="" size={156} />
             <div className="vs-waiting">Waiting for a challenger</div>
           </div>
         )}

@@ -29,7 +29,7 @@ export interface Team {
 }
 
 export const EMBLEM_LABELS: Record<LogoEmblem, string> = {
-  fin: 'Shark Fin', wave: 'Wave', bolt: 'Bolt', flame: 'Flame', trident: 'Trident',
+  fin: 'Shark', wave: 'Wave', bolt: 'Bolt', flame: 'Flame', trident: 'Trident',
   anchor: 'Anchor', star: 'Star', crown: 'Crown', drop: 'Drop', letters: 'Letters Only',
 };
 

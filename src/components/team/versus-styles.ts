@@ -89,7 +89,7 @@ export const VERSUS_CSS = String.raw`
   .vs-stage { min-height: 250px; padding: 0 1% 18px; }
   .vs-player.left { padding-right: 20%; }
   .vs-player.right { padding-left: 20%; }
-  .vs-logo { width: 82px; height: 82px; }
+  .vs-logo { width: 92px; height: 92px; }
   .vs-name { font-size: 15px; white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .vs-team { flex-wrap: wrap; font-size: 10px; gap: 4px; }
   .vs-mark span { font-size: 50px; }
