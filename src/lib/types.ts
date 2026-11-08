@@ -156,6 +156,7 @@ export interface SwimmerSummary {
   id: string;
   name: string;
   country: string;
-  avatar?: unknown;
+  /** Raw team row (id, name, abbr, logo); see resolveTeam() in lib/team-logo.ts. */
+  team?: unknown;
 }
 

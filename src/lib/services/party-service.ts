@@ -44,20 +44,20 @@ function rpcError(error: { message: string } | null): never | void {
 
 async function fetchParty(partyId: string): Promise<Party | null> {
   const supabase = getSupabase();
-  const [{ data: party }, { data: members }] = await Promise.all([
+  const memberQuery = (select: string) =>
+    supabase.from('party_members').select(select).eq('party_id', partyId).order('joined_at');
+  const [{ data: party }, teamMembers] = await Promise.all([
     supabase.from('parties').select('*').eq('id', partyId).maybeSingle(),
-    supabase
-      .from('party_members')
-      .select('user_id, joined_at, profiles(*)')
-      .eq('party_id', partyId)
-      .order('joined_at'),
+    memberQuery('user_id, joined_at, profiles(*, team:teams!profiles_team_id_fkey(id, name, abbr, logo))'),
   ]);
+  // Falls back to members without teams if the teams migration hasn't been run yet.
+  const members = teamMembers.error ? (await memberQuery('user_id, joined_at, profiles(*)')).data : teamMembers.data;
   if (!party) return null;
   const summaries: SwimmerSummary[] = (members ?? []).map((m: any) => ({
     id: m.user_id,
     name: m.profiles?.name ?? 'Swimmer',
     country: m.profiles?.country ?? '',
-    avatar: m.profiles?.avatar ?? null,
+    team: m.profiles?.team ?? null,
   }));
   return mapParty(party, summaries);
 }

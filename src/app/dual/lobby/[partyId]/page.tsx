@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { formatTime, swimTimeToMs } from '@/lib/utils';
 import Link from 'next/link';
-import { LobbyPoolScene } from '@/components/avatar/lobby-pool-scene';
+import { VersusScreen } from '@/components/team/versus-screen';
 
 type TimingMethod = 'wearable' | 'timer';
 
@@ -191,21 +191,19 @@ export default function LobbyPage({ params }: { params: Promise<{ partyId: strin
   return (
     <div className="container mx-auto max-w-4xl space-y-8">
       <div className="space-y-2 pt-4">
-        <LobbyPoolScene
+        <VersusScreen
           swimmers={members}
           currentUserId={user.id}
           hostId={party.hostId}
-          waiting={party.status === 'waiting'}
-          lanes={party.isPublic ? 8 : 4}
-          title={party.status === 'waiting' ? (members.length > 1 && isHost ? 'Swimmers ready' : 'Waiting for swimmers') : 'Race in progress'}
-          subtitle={`${party.event}${party.round ? ` · ${party.round}` : ''} · ${members.length} ${members.length === 1 ? 'swimmer' : 'swimmers'} on deck`}
+          event={`${party.event}${party.round ? ` · ${party.round}` : ''}`}
+          status={party.status === 'waiting' ? (members.length > 1 ? 'ready' : 'waiting') : 'racing'}
         />
         <p className="text-center text-sm text-muted-foreground">
           {party.status === 'waiting'
             ? isHost ? 'Start the race when everyone is in.' : 'Waiting for the host to start the race...'
             : 'Race in progress. Submit your time when you touch the wall.'}
           {' '}
-          <Link href="/profile?tab=avatar" className="underline hover:text-foreground">Customize your swimmer</Link>
+          <Link href="/profile?tab=team" className="underline hover:text-foreground">Design your team logo</Link>
         </p>
       </div>
 
