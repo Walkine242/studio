@@ -11,27 +11,18 @@ import type { Notification } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import Link from 'next/link';
-
-const NOTIFICATIONS_KEY = 'dual_user_notifications';
+import { getCurrentUserId, useAuth } from '@/lib/auth/auth-provider';
 
 export function getStoredNotifications(): Notification[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
+    const userId = getCurrentUserId();
+    if (!userId) return [];
+    const raw = localStorage.getItem(`dual_user_notifications_${userId}`);
     if (raw) return JSON.parse(raw);
   } catch {}
   
-  // Default clean welcome notification for new users
-  return [
-    {
-      id: 'welcome-1',
-      type: 'result_update',
-      from: { name: 'DUAL' },
-      content: 'Welcome to Dual! Enter virtual meets, generate AI workouts, and track leaderboards.',
-      timestamp: new Date().toISOString(),
-      read: false,
-    },
-  ];
+  return [];
 }
 
 const NotificationIcon = ({ type }: { type: Notification['type'] }) => {
@@ -56,29 +47,42 @@ export function Notifications({ newNotification }: { newNotification?: Notificat
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
-  useEffect(() => {
-    setNotifications(getStoredNotifications());
-  }, []);
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
 
   useEffect(() => {
+    setNotifications(getStoredNotifications());
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      setNotifications([]);
+      return;
+    }
+
     if (newNotification && !notifications.find(n => n.id === newNotification.id)) {
       const updated = [newNotification, ...notifications];
       setNotifications(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
+        try { localStorage.setItem(`dual_user_notifications_${userId}`, JSON.stringify(updated)); } catch {}
       }
     }
-  }, [newNotification, notifications]);
+  }, [newNotification, notifications, userId]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
+    if (!userId) {
+      setNotifications([]);
+      return;
+    }
+
     if (!open && notifications.some(n => !n.read)) {
       const readAll = notifications.map(n => ({ ...n, read: true }));
       setNotifications(readAll);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(readAll));
+        try { localStorage.setItem(`dual_user_notifications_${userId}`, JSON.stringify(readAll)); } catch {}
       }
     }
   };

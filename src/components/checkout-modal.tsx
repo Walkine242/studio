@@ -10,11 +10,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard, ShieldCheck, Lock, Sparkles } from 'lucide-react';
-import { usePremiumMember } from '@/lib/hooks/use-premium-member';
+import { ShieldCheck, Lock, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface CheckoutModalProps {
@@ -23,57 +20,29 @@ interface CheckoutModalProps {
   onSuccess?: () => void;
 }
 
-export function CheckoutModal({ open, onOpenChange, onSuccess }: CheckoutModalProps) {
-  const { setPremiumStatus } = usePremiumMember();
+/** Sends the swimmer to Stripe's hosted checkout. Card details never touch Dual's servers. */
+export async function startCheckout(plan: 'monthly' | 'annual' | 'lifetime'): Promise<string | null> {
+  const res = await fetch('/api/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.url) return data.error || 'Could not start checkout. Please try again.';
+  window.location.href = data.url;
+  return null;
+}
+
+export function CheckoutModal({ open, onOpenChange }: CheckoutModalProps) {
   const { toast } = useToast();
-  
   const [loading, setLoading] = useState(false);
-  const [cardName, setCardName] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvc, setCvc] = useState('');
 
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePayment = async () => {
     setLoading(true);
-
-    try {
-      const res = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: 'annual' }),
-      });
-      const data = await res.json();
-
-      if (data.url) {
-        if (data.simulated) {
-          setTimeout(() => {
-            setPremiumStatus(true);
-            setLoading(false);
-            onOpenChange(false);
-            toast({
-              title: 'Membership Activated! 🎉',
-              description: 'Your Dual Annual Membership ($20.00 USD/year) is now active. All locked features are unlocked!',
-            });
-            if (onSuccess) onSuccess();
-          }, 800);
-        } else {
-          window.location.href = data.url;
-        }
-      } else {
-        throw new Error(data.error || 'Failed to initialize payment session.');
-      }
-    } catch (err: any) {
-      console.error('Checkout error:', err);
-      // Fallback local activation
-      setPremiumStatus(true);
+    const error = await startCheckout('annual');
+    if (error) {
       setLoading(false);
-      onOpenChange(false);
-      toast({
-        title: 'Membership Activated! 🎉',
-        description: 'Your Dual Annual Membership ($20.00 USD/year) is active. All locked features are unlocked!',
-      });
-      if (onSuccess) onSuccess();
+      toast({ variant: 'destructive', title: 'Checkout Unavailable', description: error });
     }
   };
 
@@ -86,7 +55,7 @@ export function CheckoutModal({ open, onOpenChange, onSuccess }: CheckoutModalPr
               Annual Membership
             </Badge>
             <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
-              <ShieldCheck className="size-3.5" /> Secure Checkout
+              <ShieldCheck className="size-3.5" /> Secure Checkout by Stripe
             </span>
           </div>
           <DialogTitle className="font-headline text-2xl font-bold text-white flex items-center gap-2">
@@ -98,7 +67,6 @@ export function CheckoutModal({ open, onOpenChange, onSuccess }: CheckoutModalPr
           </DialogDescription>
         </DialogHeader>
 
-        {/* Pricing Summary Box */}
         <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-500/30 flex items-center justify-between my-2">
           <div>
             <h4 className="font-bold text-white text-base">Dual Annual Pass</h4>
@@ -110,94 +78,20 @@ export function CheckoutModal({ open, onOpenChange, onSuccess }: CheckoutModalPr
           </div>
         </div>
 
-        {/* Payment Form */}
-        <form onSubmit={handlePayment} className="space-y-4 pt-2">
-          <div className="space-y-2">
-            <Label htmlFor="cardName" className="text-xs font-semibold text-slate-200">
-              Cardholder Name
-            </Label>
-            <Input
-              id="cardName"
-              placeholder="e.g. Alex Morgan"
-              value={cardName}
-              onChange={(e) => setCardName(e.target.value)}
-              required
-              className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-500"
-            />
-          </div>
+        <div className="text-[11px] text-slate-400 flex items-center gap-1.5 justify-center pt-1">
+          <Lock className="size-3 text-emerald-400" />
+          <span>You'll enter your card on Stripe's secure page. Membership activates once payment clears.</span>
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="cardNumber" className="text-xs font-semibold text-slate-200">
-              Card Number
-            </Label>
-            <div className="relative">
-              <Input
-                id="cardNumber"
-                placeholder="4532 •••• •••• 8892"
-                maxLength={19}
-                value={cardNumber}
-                onChange={(e) => setCardNumber(e.target.value)}
-                required
-                className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 pl-10 focus:border-blue-500"
-              />
-              <CreditCard className="absolute left-3 top-2.5 size-5 text-slate-400" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="expiry" className="text-xs font-semibold text-slate-200">
-                Expires (MM/YY)
-              </Label>
-              <Input
-                id="expiry"
-                placeholder="08/28"
-                maxLength={5}
-                value={expiry}
-                onChange={(e) => setExpiry(e.target.value)}
-                required
-                className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-500"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cvc" className="text-xs font-semibold text-slate-200">
-                Security Code (CVC)
-              </Label>
-              <Input
-                id="cvc"
-                placeholder="382"
-                maxLength={4}
-                value={cvc}
-                onChange={(e) => setCvc(e.target.value)}
-                required
-                className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Guarantee / Privacy disclaimer */}
-          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 justify-center pt-1">
-            <Lock className="size-3 text-emerald-400" />
-            <span>Member feature access unlocked immediately. No admin permissions granted.</span>
-          </div>
-
-          <DialogFooter className="pt-2">
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full min-h-[44px] h-auto py-2.5 px-2 text-xs sm:text-sm font-bold bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg text-center flex items-center justify-center"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <span className="size-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  Processing $20.00 Payment...
-                </span>
-              ) : (
-                'Complete Purchase — $20.00 USD / Year'
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
+        <DialogFooter className="pt-2">
+          <Button
+            onClick={handlePayment}
+            disabled={loading}
+            className="w-full min-h-[44px] h-auto py-2.5 px-2 text-xs sm:text-sm font-bold bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg"
+          >
+            {loading ? 'Opening secure checkout...' : 'Continue to Payment — $20.00 USD / Year'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

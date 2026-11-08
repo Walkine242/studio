@@ -70,7 +70,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { getFriends, type Friend } from '@/lib/friends';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { saveWorkout, getSavedWorkouts, deleteSavedWorkout, type SavedWorkout } from '@/lib/services/workout-service';
+import { useWorkoutLogs } from '@/lib/hooks/use-workout-logs';
 import Image from 'next/image';
+import {
+  useConnectedDevices,
+  DEVICE_METADATA,
+  type ConnectedDeviceKey,
+} from '@/lib/hooks/use-connected-devices';
+import { ConnectDeviceModal } from '@/components/connect-device-modal';
+import { Badge } from '@/components/ui/badge';
+import { Bluetooth, CheckCircle2, Wifi, AlertCircle, X } from 'lucide-react';
 
 const EQUIPMENT_OPTIONS = [
   'Buoy',
@@ -100,6 +109,10 @@ const workoutSchema = z.object({
 
 type WorkoutFormData = z.infer<typeof workoutSchema>;
 
+// AI output is shown with line breaks; escape it first so it can't inject HTML.
+const toSafeHtml = (text: string) =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br />');
+
 export default function WorkoutGeneratorPage() {
   const [workout, setWorkout] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -110,6 +123,7 @@ export default function WorkoutGeneratorPage() {
   const [activeTab, setActiveTab] = useState<string>('generator');
   const [selectedHistoryWorkout, setSelectedHistoryWorkout] = useState<SavedWorkout | null>(null);
   const { toast } = useToast();
+  const { addWorkoutLog } = useWorkoutLogs();
   const workoutRef = useRef<HTMLDivElement>(null);
 
   // Practice Mode states
@@ -118,14 +132,25 @@ export default function WorkoutGeneratorPage() {
   const [syncProgress, setSyncProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
-  const [currentHeartRate, setCurrentHeartRate] = useState(135);
   const [recordedLaps, setRecordedLaps] = useState<number>(0);
   const [lapSplits, setLapSplits] = useState<string[]>([]);
   const [activePracticeSet, setActivePracticeSet] = useState<'Warm Up' | 'Main Set' | 'Cool Down'>('Warm Up');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [coachAnalysis, setCoachAnalysis] = useState<string | null>(null);
 
-  const friends = getFriends();
+  const [friends, setFriends] = useState<Friend[]>([]);
+  useEffect(() => { getFriends().then(setFriends); }, []);
+  // Wearable Device Connection Integration
+  const { devices, getConnectedList } = useConnectedDevices();
+  const [modalDeviceKey, setModalDeviceKey] = useState<ConnectedDeviceKey | null>(null);
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+
+  const connectedKeys = getConnectedList();
+  const hasConnectedDevice = connectedKeys.length > 0;
+  const activeDeviceKey = hasConnectedDevice ? connectedKeys[0] : null;
+  const activeDeviceInfo = activeDeviceKey ? devices[activeDeviceKey] : null;
+  const activeDeviceMeta = activeDeviceKey ? DEVICE_METADATA[activeDeviceKey] : null;
+
 
   const form = useForm<WorkoutFormData>({
     resolver: zodResolver(workoutSchema),
@@ -147,26 +172,16 @@ export default function WorkoutGeneratorPage() {
     loadSavedWorkouts();
   }, []);
 
-  // Practice Timer and Heart Rate Simulator
+  // Practice timer
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isPracticeMode && practiceStep === 'active' && !isPaused) {
       timer = setInterval(() => {
         setSecondsElapsed((prev) => prev + 1);
-        // Simulate heart rate changes based on active set
-        setCurrentHeartRate((prev) => {
-          const targetMin = activePracticeSet === 'Warm Up' ? 115 : activePracticeSet === 'Main Set' ? 145 : 110;
-          const targetMax = activePracticeSet === 'Warm Up' ? 135 : activePracticeSet === 'Main Set' ? 170 : 125;
-          const change = Math.floor(Math.random() * 5) - 2; // -2 to +2
-          const nextHr = prev + change;
-          if (nextHr < targetMin) return targetMin;
-          if (nextHr > targetMax) return targetMax;
-          return nextHr;
-        });
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [isPracticeMode, practiceStep, isPaused, activePracticeSet]);
+  }, [isPracticeMode, practiceStep, isPaused]);
 
   // Syncing screen animation
   useEffect(() => {
@@ -279,37 +294,51 @@ export default function WorkoutGeneratorPage() {
     document.body.removeChild(link);
   };
 
-  const handleSendWorkout = (friend: Friend) => {
-    toast({
-        title: 'Workout Sent!',
-        description: `Your generated workout has been sent to ${friend.name}.`
-    });
-    setSentInvites(prev => [...prev, friend.id]);
+  // No in-app messaging yet: share the workout text through the phone's share
+  // sheet, or copy it so you can paste it to them.
+  const handleSendWorkout = async (friend: Friend) => {
+    if (!workout) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Swim workout from Dual', text: workout });
+      } else {
+        await navigator.clipboard.writeText(workout);
+        toast({
+          title: 'Workout Copied',
+          description: `Paste it into a message to ${friend.name}.`,
+        });
+      }
+      setSentInvites(prev => [...prev, friend.id]);
+    } catch {
+      // Share sheet dismissed.
+    }
   };
 
   // Practice Mode trigger
   const startPractice = () => {
-    setPracticeStep('syncing');
+    setSecondsElapsed(0);
+    setRecordedLaps(0);
+    setLapSplits([]);
+    setIsPaused(false);
+    setPracticeStep('active');
     setIsPracticeMode(true);
     setCoachAnalysis(null);
   };
 
-  // Record a simulated lap split
+  // Record a lap split: the time since the previous lap.
   const recordLap = () => {
-    const targetPaceStr = form.getValues().basePace || '1:30';
-    const [min, sec] = targetPaceStr.split(':').map(Number);
-    const targetSeconds = (min * 60) + sec;
-    // Add random slight variation (-3 to +3 seconds)
-    const lapSeconds = targetSeconds + (Math.floor(Math.random() * 7) - 3);
-    const lapMin = Math.floor(lapSeconds / 60);
-    const lapSec = lapSeconds % 60;
-    const formattedSplit = `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`;
-    
+    const previous = lapSplits.reduce((sum, split) => {
+      const [m, sc] = split.split(':').map(Number);
+      return sum + m * 60 + sc;
+    }, 0);
+    const lapSeconds = Math.max(1, secondsElapsed - previous);
+    const formattedSplit = `${Math.floor(lapSeconds / 60)}:${String(lapSeconds % 60).padStart(2, '0')}`;
+
     setLapSplits((prev) => [...prev, formattedSplit]);
     setRecordedLaps((prev) => prev + 1);
     toast({
       title: `Lap ${recordedLaps + 1} Recorded!`,
-      description: `Split: ${formattedSplit} per 100m`,
+      description: `Split: ${formattedSplit}`,
     });
   };
 
@@ -320,32 +349,51 @@ export default function WorkoutGeneratorPage() {
     setIsAnalyzing(true);
 
     const values = form.getValues();
-    const finalLaps = recordedLaps === 0 ? 10 : recordedLaps;
-    const dummySplits = lapSplits.length === 0 ? ['1:29', '1:31', '1:30', '1:28', '1:32'] : lapSplits;
-    
-    // Calculate average pace from splits
-    let totalSec = 0;
-    dummySplits.forEach((s) => {
-      const [m, sc] = s.split(':').map(Number);
-      totalSec += (m * 60) + sc;
-    });
-    const avgSec = Math.round(totalSec / dummySplits.length);
-    const avgPaceStr = `${Math.floor(avgSec / 60)}:${avgSec % 60 < 10 ? '0' : ''}${avgSec % 60}`;
+    const splits = lapSplits;
+    let avgPaceStr = 'N/A';
+    if (splits.length > 0) {
+      const totalSec = splits.reduce((sum, split) => {
+        const [m, sc] = split.split(':').map(Number);
+        return sum + m * 60 + sc;
+      }, 0);
+      const avgSec = Math.round(totalSec / splits.length);
+      avgPaceStr = `${Math.floor(avgSec / 60)}:${String(avgSec % 60).padStart(2, '0')}`;
+    }
+
+    // Save the session to the swimmer's workout log.
+    try {
+      await addWorkoutLog({
+        title: `AI Practice Set: ${values.targetStroke && values.targetStroke !== 'N/A' ? values.targetStroke : 'Freestyle'} (${values.intensity || 'Endurance'})`,
+        date: new Date().toISOString().slice(0, 10),
+        location: hasConnectedDevice && activeDeviceMeta ? `${activeDeviceMeta.name} Session` : 'Pool Practice (Manual Timer)',
+        source: activeDeviceKey || 'manual',
+        duration: formatTime(secondsElapsed),
+        distance: values.typicalDistance || '',
+        avgPace: avgPaceStr === 'N/A' ? '' : `${avgPaceStr}/lap`,
+      });
+    } catch (error) {
+      console.error('Failed to save workout log:', error);
+    }
+
+    if (splits.length === 0) {
+      setCoachAnalysis('No lap splits were recorded, so there is nothing to analyze yet. Next time, tap "Lap Split" after each lap to get feedback on your pacing.');
+      setIsAnalyzing(false);
+      return;
+    }
 
     try {
       const analysis = await analyzeWorkoutPerformance({
-        targetPace: values.basePace || '1:30',
+        targetPace: values.basePace || 'N/A',
         avgPace: avgPaceStr,
         duration: formatTime(secondsElapsed),
-        laps: finalLaps,
-        avgHeartRate: Math.round(140 + Math.random() * 10),
+        laps: splits.length,
         strokeFocus: values.targetStroke || 'General',
-        splits: dummySplits,
+        splits,
       });
       setCoachAnalysis(analysis.feedback);
     } catch (error) {
       console.error(error);
-      setCoachAnalysis("Excellent swim session! You maintained consistent pacing throughout the set and finished strong. Keep working on high elbow catch on your recovery phase.");
+      setCoachAnalysis('Coach Mikey could not review this session right now. Your workout was still saved to your log.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -365,25 +413,66 @@ export default function WorkoutGeneratorPage() {
         {isPracticeMode && (
           <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6 text-white overflow-y-auto">
             
-            {/* Step 1: Device Syncing Animation */}
+            {/* Step 1: Device Syncing Screen */}
             {practiceStep === 'syncing' && (
-              <div className="flex flex-col items-center gap-6 max-w-md text-center">
-                <div className="relative size-28 rounded-full border-4 border-dashed border-blue-500 animate-spin flex items-center justify-center">
-                  <Smartphone className="size-12 text-blue-400 absolute animate-bounce" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Synchronizing Swim Set</h2>
-                  <p className="text-gray-400 mt-2 text-sm">
-                    Connecting to your Apple Watch / Garmin device via Bluetooth...
-                  </p>
-                </div>
-                <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/10">
-                  <div 
-                    className="bg-gradient-to-r from-blue-500 to-orange-500 h-full transition-all duration-300"
-                    style={{ width: `${syncProgress}%` }}
-                  />
-                </div>
-                <span className="text-xs text-gray-500">{syncProgress}% Synced</span>
+              <div className="flex flex-col items-center gap-6 max-w-md text-center bg-slate-900/80 p-8 rounded-2xl border border-slate-800 shadow-2xl">
+                {hasConnectedDevice ? (
+                  <>
+                    <div className="relative size-28 rounded-full border-4 border-dashed border-cyan-400 animate-spin flex items-center justify-center">
+                      <Smartphone className="size-12 text-cyan-400 absolute animate-bounce" />
+                    </div>
+                    <div>
+                      <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 text-xs mb-2">
+                        {activeDeviceInfo?.connectionType === 'bluetooth-le' ? 'Bluetooth LE Stream' : 'Cloud API Telemetry'}
+                      </Badge>
+                      <h2 className="text-2xl font-bold text-white">Synchronizing Swim Set</h2>
+                      <p className="text-slate-300 mt-2 text-sm">
+                        Authorizing real-time session telemetry stream from <strong>{activeDeviceMeta?.name}</strong>...
+                      </p>
+                    </div>
+                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
+                      <div 
+                        className="bg-gradient-to-r from-cyan-400 to-blue-500 h-full transition-all duration-300"
+                        style={{ width: `${syncProgress}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono">{syncProgress}% Telemetry Stream Ready</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-4 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                      <Clock className="size-12" />
+                    </div>
+                    <div className="space-y-1">
+                      <Badge variant="outline" className="border-amber-500/40 text-amber-300 text-xs">
+                        Manual Stopwatch Mode
+                      </Badge>
+                      <h2 className="text-xl font-bold text-white">No Swim Sensor Connected</h2>
+                      <p className="text-slate-400 text-xs">
+                        No wearable heart rate sensor or smartwatch is paired. Practice will run in manual stopwatch mode without real-time heart rate telemetry.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col w-full gap-2 pt-2">
+                      <Button
+                        onClick={() => {
+                          setModalDeviceKey(null);
+                          setIsConnectModalOpen(true);
+                        }}
+                        className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold text-xs h-10 shadow-lg"
+                      >
+                        <Bluetooth className="mr-2 size-4" /> Connect Wearable Swim Sensor
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setPracticeStep('active')}
+                        className="w-full border-slate-700 text-slate-300 hover:bg-slate-800 font-semibold text-xs h-10"
+                      >
+                        <Play className="mr-2 size-4 text-emerald-400" /> Start Manual Stopwatch Practice
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -395,9 +484,24 @@ export default function WorkoutGeneratorPage() {
                     <Activity className="size-6 text-orange-500 animate-pulse" />
                     <h2 className="text-xl font-bold uppercase tracking-widest text-orange-400">Dual Live HUD</h2>
                   </div>
-                  <span className="bg-blue-600 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
-                    {activePracticeSet}
-                  </span>
+
+                  <div className="flex items-center gap-3">
+                    {hasConnectedDevice ? (
+                      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/40 text-xs flex items-center gap-1.5 px-3 py-1">
+                        <CheckCircle2 className="size-3.5 text-emerald-400" />
+                        <span>Synced with {activeDeviceMeta?.name}</span>
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-amber-500/40 text-amber-300 text-xs flex items-center gap-1.5 px-3 py-1">
+                        <Clock className="size-3.5 text-amber-400" />
+                        <span>Manual Stopwatch Mode (No HR Sensor)</span>
+                      </Badge>
+                    )}
+
+                    <span className="bg-blue-600 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
+                      {activePracticeSet}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid gap-8 md:grid-cols-12 items-stretch">
@@ -407,38 +511,48 @@ export default function WorkoutGeneratorPage() {
                       {/* Pulse Ring */}
                       <div 
                         className="absolute inset-[-10px] rounded-full border-[10px] border-orange-500/30 transition-all duration-500 animate-ping"
-                        style={{ animationDuration: `${60 / (currentHeartRate / 60)}s` }}
+                        style={{ animationDuration: '2s' }}
                       />
                       <div className="text-xs uppercase tracking-widest text-gray-400 font-bold mb-1">Live Workout</div>
                       <div className="text-4xl font-mono font-extrabold tracking-widest text-white">
                         {formatTime(secondsElapsed)}
                       </div>
                       
-                      <div className="flex items-center gap-1.5 mt-3 text-red-500 animate-pulse font-bold text-lg">
-                        <Heart className="size-5 fill-current" />
-                        <span>{currentHeartRate} <span className="text-xs text-gray-400">BPM</span></span>
-                      </div>
 
                       <div className="mt-4 text-sm text-gray-400 flex flex-col items-center">
-                        <div>Lap Time: <strong className="text-white font-mono">{form.getValues().basePace || '1:30'}</strong></div>
+                        <div>Target Pace: <strong className="text-white font-mono">{form.getValues().basePace || 'N/A'}</strong></div>
                         <div className="mt-1 text-blue-400">Completed Laps: <strong className="text-lg">{recordedLaps}</strong></div>
                       </div>
                     </div>
-                    
+
+                    {!hasConnectedDevice && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setModalDeviceKey(null);
+                          setIsConnectModalOpen(true);
+                        }}
+                        className="mt-4 border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/60 font-semibold text-xs h-8"
+                      >
+                        <Bluetooth className="size-3.5 mr-1.5" /> Pair Heart Rate Monitor
+                      </Button>
+                    )}
+
                     {/* Device HUD Controls */}
-                    <div className="flex gap-4 mt-6">
+                    <div className="flex gap-3 mt-6">
                       <Button 
                         variant="outline" 
                         onClick={() => setIsPaused(!isPaused)} 
-                        className="border-white/20 bg-white/5 hover:bg-white/15 text-white"
+                        className="border-white/20 bg-white/5 hover:bg-white/15 text-white text-xs h-9"
                       >
-                        {isPaused ? <Play className="mr-2 size-4" /> : <Pause className="mr-2 size-4" />}
+                        {isPaused ? <Play className="mr-1.5 size-3.5" /> : <Pause className="mr-1.5 size-3.5" />}
                         {isPaused ? 'Resume' : 'Pause'}
                       </Button>
-                      <Button onClick={recordLap} className="bg-blue-600 hover:bg-blue-700 text-white font-bold">
+                      <Button onClick={recordLap} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-9">
                         Lap Split
                       </Button>
-                      <Button onClick={finishPractice} className="bg-red-600 hover:bg-red-700 text-white font-bold">
+                      <Button onClick={finishPractice} className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs h-9">
                         Finish Workout
                       </Button>
                     </div>
@@ -449,14 +563,14 @@ export default function WorkoutGeneratorPage() {
                     <div>
                       <h3 className="text-lg font-bold text-blue-400 mb-2">Practice Overview</h3>
                       <p className="text-sm text-gray-300 leading-relaxed mb-4">
-                        Perform the sets as written on the whiteboard. When you complete a lap, click the <strong>Lap Split</strong> button on the smartwatch to record your interval pacing splits.
+                        Perform the sets as written on the whiteboard. Each time you finish a lap or rep, tap <strong>Lap Split</strong> to record your split.
                       </p>
                       
                       {/* Active Workout Whiteboard Preview */}
                       <ScrollArea className="h-64 rounded-lg bg-slate-900 border border-white/10 p-4">
                         <div 
                           className="font-marker text-slate-200 text-base whitespace-pre-wrap leading-loose"
-                          dangerouslySetInnerHTML={{ __html: workout ? workout.replace(/\n/g, '<br />') : '' }}
+                          dangerouslySetInnerHTML={{ __html: workout ? toSafeHtml(workout) : '' }}
                         />
                       </ScrollArea>
                     </div>
@@ -489,7 +603,7 @@ export default function WorkoutGeneratorPage() {
                 <div className="text-center">
                   <Trophy className="size-16 text-yellow-500 mx-auto animate-bounce mb-2" />
                   <h2 className="text-3xl font-extrabold text-white">Workout Finished!</h2>
-                  <p className="text-blue-200 mt-1">Excellent performance. Here is your practice telemetry report.</p>
+                  <p className="text-blue-200 mt-1">Saved to your workout log. Here is your session report.</p>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-4">
@@ -499,19 +613,25 @@ export default function WorkoutGeneratorPage() {
                   </div>
                   <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-center">
                     <span className="text-xs uppercase text-gray-400 font-bold block mb-1">Laps Completed</span>
-                    <strong className="text-2xl font-mono text-white">{recordedLaps === 0 ? 10 : recordedLaps}</strong>
+                    <strong className="text-2xl font-mono text-white">{recordedLaps}</strong>
                   </div>
                   <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-center">
-                    <span className="text-xs uppercase text-gray-400 font-bold block mb-1">Avg Heart Rate</span>
+                    <span className="text-xs uppercase text-gray-400 font-bold block mb-1">Fastest Lap</span>
                     <strong className="text-2xl font-mono text-red-400 flex items-center justify-center gap-1">
-                      <Heart className="size-4 fill-current" /> {Math.round(140 + Math.random() * 10)} BPM
+                      {lapSplits.length ? [...lapSplits].sort((a, b) => {
+                        const toS = (x: string) => { const [m, sc] = x.split(':').map(Number); return m * 60 + sc; };
+                        return toS(a) - toS(b);
+                      })[0] : '—'}
                     </strong>
                   </div>
                   <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-center">
                     <span className="text-xs uppercase text-gray-400 font-bold block mb-1">Est. Calories</span>
                     <strong className="text-2xl font-mono text-orange-400 flex items-center justify-center gap-1">
-                      <Flame className="size-4 fill-current" /> {Math.round((secondsElapsed * 0.15))} kcal
+                      <Flame className="size-4 fill-current" /> {Math.round((secondsElapsed * (hasConnectedDevice ? 0.16 : 0.12)))} kcal
                     </strong>
+                    <span className="text-[10px] text-gray-400 font-medium block mt-0.5">
+                      {hasConnectedDevice ? 'From Telemetry' : 'Manual Estimate'}
+                    </span>
                   </div>
                 </div>
 
@@ -524,10 +644,10 @@ export default function WorkoutGeneratorPage() {
                     </h3>
                     <ScrollArea className="h-64 pr-2">
                       <ul className="space-y-2">
-                        {(lapSplits.length === 0 ? ['1:29', '1:31', '1:30', '1:28', '1:32'] : lapSplits).map((split, i) => (
+                        {lapSplits.map((split, i) => (
                           <li key={i} className="flex justify-between items-center text-sm bg-white/5 p-2 rounded border border-white/5 font-mono">
                             <span className="text-gray-400">Lap {i + 1}</span>
-                            <span className="text-white font-bold">{split} /100m</span>
+                            <span className="text-white font-bold">{split}</span>
                           </li>
                         ))}
                       </ul>
@@ -549,7 +669,7 @@ export default function WorkoutGeneratorPage() {
                       ) : (
                         <div 
                           className="font-marker text-slate-800 leading-relaxed whitespace-pre-wrap"
-                          dangerouslySetInnerHTML={{ __html: coachAnalysis || '' }}
+                          dangerouslySetInnerHTML={{ __html: toSafeHtml(coachAnalysis || '') }}
                         />
                       )}
                     </div>
@@ -927,7 +1047,7 @@ export default function WorkoutGeneratorPage() {
                         <div
                           ref={workoutRef}
                           className="font-marker text-slate-800 text-lg leading-relaxed whitespace-pre-wrap selection:bg-blue-200"
-                          dangerouslySetInnerHTML={{ __html: workout.replace(/\n/g, '<br />') }}
+                          dangerouslySetInnerHTML={{ __html: toSafeHtml(workout) }}
                         />
                      </ScrollArea>
                   )}
@@ -1039,7 +1159,7 @@ export default function WorkoutGeneratorPage() {
                         <div className="flex-1 p-6 overflow-y-auto bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]">
                           <div 
                             className="font-marker text-slate-800 text-lg leading-relaxed whitespace-pre-wrap"
-                            dangerouslySetInnerHTML={{ __html: item.workout.replace(/\n/g, '<br />') }}
+                            dangerouslySetInnerHTML={{ __html: toSafeHtml(item.workout) }}
                           />
                         </div>
                       </DialogContent>
@@ -1051,6 +1171,11 @@ export default function WorkoutGeneratorPage() {
           )}
         </TabsContent>
       </div>
+      <ConnectDeviceModal
+        open={isConnectModalOpen}
+        onOpenChange={setIsConnectModalOpen}
+        deviceKey={modalDeviceKey}
+      />
     </Tabs>
   );
 }

@@ -20,8 +20,8 @@
     },
     {
       "id": "dashboard-dual",
-      "description": "Two swimmers diving into a pool to start a race.",
-      "imageUrl": "https://r0.image2url.com/images/1766270310106-3266ea81-a525-4254-9abe-90703cbcd044.png",
+      "description": "Dual Mode competitive race banner",
+      "imageUrl": "/Dual.png?v=2",
       "imageHint": "swimmers racing"
     },
     {
@@ -32,20 +32,20 @@
     },
     {
       "id": "landing-background",
-      "description": "A swimmer at the starting block of a pool.",
-      "imageUrl": "https://image2url.com/images/1763760702180-bdd1ac21-d294-4f48-9fbe-5524b262eee3.jpg",
+      "description": "Dual landing background logo",
+      "imageUrl": "/Dual.png?v=2",
       "imageHint": "swimmer starting"
     },
     {
       "id": "dual-custom-race",
-      "description": "A swimmer practicing in a pool lane.",
-      "imageUrl": "https://images.unsplash.com/photo-1609601245136-65c32298fb30?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8c3dpbSUyMHByYWN0aWNlfGVufDB8fHx8MTc1ODc0MTU5NXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "description": "Dual custom race banner",
+      "imageUrl": "/Dual.png?v=2",
       "imageHint": "swimmer practice"
     },
     {
       "id": "connecting-background",
-      "description": "Starting blocks lined up at the edge of a swimming pool.",
-      "imageUrl": "https://images.unsplash.com/photo-1542648834-8b548a393b4f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxzd2ltbWluZyUyMHBvb2wlMjBzdGFydGluZyUyMGJsb2Nrc3xlbnwwfHx8fDE3NTg3NDI2NzR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "description": "Dual race connecting background",
+      "imageUrl": "/Dual.png?v=2",
       "imageHint": "starting blocks"
     }
   ]

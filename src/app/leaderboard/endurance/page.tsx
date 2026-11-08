@@ -29,55 +29,24 @@ import { getCountryByCode } from '@/lib/countries';
 import Image from 'next/image';
 
 const mockGlobalResults = {
-  '1-hour': [
-    { rank: 1, swimmer: 'Alex Johnson', distance: '4,520m', countryCode: 'USA', points: 100 },
-    { rank: 2, swimmer: 'Yuki Tanaka', distance: '4,480m', countryCode: 'JPN', points: 90 },
-    { rank: 3, swimmer: 'Sven Eriksson', distance: '4,450m', countryCode: 'SWE', points: 80 },
-    { rank: 4, swimmer: 'Maria Garcia', distance: '4,430m', countryCode: 'ESP', points: 70 },
-    { rank: 5, swimmer: 'David Lee', distance: '4,415m', countryCode: 'CAN', points: 60 },
-    { rank: 6, swimmer: 'Anya Petrova', distance: '4,405m', countryCode: 'RUS', points: 50 },
-    { rank: 7, swimmer: 'Carlos Silva', distance: '4,390m', countryCode: 'BRA', points: 40 },
-    { rank: 8, swimmer: 'You', distance: '4,380m', countryCode: 'USA', points: 30 },
-    { rank: 9, swimmer: 'Li Wei', distance: '4,375m', countryCode: 'CHN', points: 20 },
-    { rank: 10, swimmer: 'John Smith', distance: '4,360m', countryCode: 'GBR', points: 10 },
-  ],
-  '12-hour': [
-    { rank: 1, swimmer: 'Fatima Al-Fahim', distance: '40.1km', countryCode: 'UAE', points: 100 },
-    { rank: 2, swimmer: 'Chloe Dubois', distance: '38.9km', countryCode: 'FRA', points: 90 },
-    { rank: 3, swimmer: 'You', distance: '35.5km', countryCode: 'USA', points: 80 },
-    { rank: 4, swimmer: 'Sven Eriksson', distance: '34.2km', countryCode: 'SWE', points: 70 },
-    { rank: 5, swimmer: 'Yuki Tanaka', distance: '33.8km', countryCode: 'JPN', points: 60 },
-    { rank: 6, swimmer: 'Alex Johnson', distance: '33.5km', countryCode: 'USA', points: 50 },
-  ],
-   'tether': [
-    { rank: 1, swimmer: 'You', time: '03:15:22', countryCode: 'USA', points: 100 },
-    { rank: 2, swimmer: 'Alex Johnson', time: '03:12:01', countryCode: 'USA', points: 90 },
-    { rank: 3, swimmer: 'Yuki Tanaka', time: '02:58:45', countryCode: 'JPN', points: 80 },
-    { rank: 4, swimmer: 'Fatima Al-Fahim', time: '02:55:10', countryCode: 'UAE', points: 70 },
-    { rank: 5, swimmer: 'Sven Eriksson', time: '02:51:33', countryCode: 'SWE', points: 60 },
-  ],
+  '1-hour': [],
+  '12-hour': [],
+  'tether': [],
+  '24-hour': [],
 };
 
 const mockCountryResults = {
-    '1-hour': [
-        { rank: 1, swimmer: 'Alex Johnson', distance: '4,520m', points: 50 },
-        { rank: 2, swimmer: 'You', distance: '4,380m', points: 45 },
-        { rank: 3, swimmer: 'Michael Phelps', distance: '4,350m', points: 40 },
-    ],
-    '12-hour': [
-        { rank: 1, swimmer: 'You', distance: '35.5km', points: 50 },
-        { rank: 2, swimmer: 'Alex Johnson', distance: '33.5km', points: 45 },
-    ],
-    'tether': [
-         { rank: 1, swimmer: 'You', time: '03:15:22', points: 50 },
-         { rank: 2, swimmer: 'Alex Johnson', time: '03:12:01', points: 45 },
-    ]
-}
+  '1-hour': [],
+  '12-hour': [],
+  'tether': [],
+  '24-hour': [],
+};
 
 const mockLocalResults = {
-  '1-hour': [{ rank: 8, distance: '4,380m', date: '2024-08-01' }],
-  '12-hour': [{ rank: 3, distance: '35.5km', date: '2024-07-15' }],
-  'tether': [{ rank: 1, time: '03:15:22', date: '2024-06-20' }],
+  '1-hour': [],
+  '12-hour': [],
+  'tether': [],
+  '24-hour': [],
 };
 
 type Challenge = '1-hour' | '12-hour' | '24-hour' | 'tether';

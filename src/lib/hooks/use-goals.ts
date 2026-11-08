@@ -1,85 +1,84 @@
-
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import type { Goal } from '@/lib/types';
-import { getUserId as getCurrentUserId } from '@/lib/hooks/use-user-profile';
+import { getUserId } from '@/lib/hooks/use-user-profile';
+import { useAuth } from '@/lib/auth/auth-provider';
+import { getSupabase } from '@/lib/supabase/client';
 
-
-const STORAGE_KEY = 'aquaSpeed-goals';
-
-const initialData: Goal[] = [
-    { id: '1', description: 'Swim 100m freestyle under 1:00', targetDate: new Date('2024-09-01').toISOString(), completed: false, type: 'custom', userId: 'user_zivts43' },
-    { id: '2', description: 'Complete a 3000m workout', targetDate: new Date('2024-08-15').toISOString(), completed: false, type: 'custom', userId: 'user_zivts43' },
-    { id: '3', description: 'Improve 50m butterfly time by 1s', targetDate: new Date('2024-10-01').toISOString(), completed: false, type: 'custom', userId: 'user_zivts43' },
-    { id: '4', description: 'Learn flip turns', targetDate: new Date('2023-05-20').toISOString(), completed: true, type: 'custom', userId: 'user_zivts43' },
-];
+function mapGoal(row: any): Goal {
+  return {
+    id: row.id,
+    description: row.description,
+    targetDate: row.target_date ? new Date(row.target_date).toISOString() : '',
+    completed: row.completed,
+    type: row.type,
+    event: row.event ?? undefined,
+    targetTime: row.target_time ?? undefined,
+    league: row.league ?? undefined,
+    targetRank: row.target_rank ?? undefined,
+    meetId: row.meet_id ?? undefined,
+    userId: row.user_id,
+  };
+}
 
 export function useGoals(userId?: string) {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
-  const targetUserId = userId || getCurrentUserId();
+  const { user } = useAuth();
+  const targetUserId = userId || user?.id || null;
 
-  useEffect(() => {
-    try {
-      const storedData = localStorage.getItem(STORAGE_KEY);
-      const allGoals: Goal[] = storedData ? JSON.parse(storedData) : initialData;
-      if (targetUserId) {
-        setGoals(allGoals.filter(g => g.userId === targetUserId));
-      } else {
-        setGoals(initialData.filter(g => g.userId === 'user_zivts43'));
-      }
-    } catch (error) {
-      console.error('Failed to load goals from localStorage', error);
-      setGoals(initialData.filter(g => g.userId === targetUserId));
+  const load = useCallback(async () => {
+    if (!targetUserId) {
+      setGoals([]);
+      setIsInitialized(true);
+      return;
     }
+    const { data, error } = await getSupabase()
+      .from('goals')
+      .select('*')
+      .eq('user_id', targetUserId)
+      .order('created_at', { ascending: false });
+    if (error) console.error('Failed to load goals:', error);
+    setGoals((data ?? []).map(mapGoal));
     setIsInitialized(true);
   }, [targetUserId]);
 
-   const updateAllGoals = (allGoals: Goal[]) => {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(allGoals));
-        if (targetUserId) {
-            setGoals(allGoals.filter(g => g.userId === targetUserId));
-        }
-    } catch (error) {
-        console.error('Failed to save goals to localStorage', error);
-    }
-  }
+  useEffect(() => {
+    load();
+  }, [load]);
 
+  const addGoal = useCallback(async (goal: Omit<Goal, 'id' | 'completed' | 'userId'>) => {
+    const me = getUserId();
+    if (!me) return;
+    const { error } = await getSupabase().from('goals').insert({
+      user_id: me,
+      description: goal.description,
+      target_date: goal.targetDate ? goal.targetDate.slice(0, 10) : null,
+      type: goal.type,
+      event: goal.event || null,
+      target_time: goal.targetTime || null,
+      league: goal.league || null,
+      target_rank: goal.targetRank || null,
+      meet_id: goal.meetId || null,
+    });
+    if (error) console.error('Failed to add goal:', error);
+    await load();
+  }, [load]);
 
-  const addGoal = useCallback((goal: Omit<Goal, 'id' | 'completed' | 'userId'>) => {
-    const currentUserId = getCurrentUserId();
-    if (!currentUserId) return;
+  const removeGoal = useCallback(async (id: string) => {
+    setGoals((prev) => prev.filter((g) => g.id !== id));
+    const { error } = await getSupabase().from('goals').delete().eq('id', id);
+    if (error) console.error('Failed to remove goal:', error);
+  }, []);
 
-    const newGoal: Goal = {
-      ...goal,
-      id: Date.now().toString(),
-      completed: false,
-      userId: currentUserId,
-    };
-    
-    const storedData = localStorage.getItem(STORAGE_KEY);
-    const allGoals: Goal[] = storedData ? JSON.parse(storedData) : initialData;
-    updateAllGoals([newGoal, ...allGoals]);
-  }, [targetUserId]);
-
-  const removeGoal = useCallback((id: string) => {
-    const storedData = localStorage.getItem(STORAGE_KEY);
-    const allGoals: Goal[] = storedData ? JSON.parse(storedData) : initialData;
-    const updatedGoals = allGoals.filter((goal) => goal.id !== id);
-    updateAllGoals(updatedGoals);
-  }, [targetUserId]);
-
-  const toggleGoal = useCallback((id: string) => {
-    const storedData = localStorage.getItem(STORAGE_KEY);
-    const allGoals: Goal[] = storedData ? JSON.parse(storedData) : initialData;
-    const updatedGoals = allGoals.map((goal) =>
-        goal.id === id ? { ...goal, completed: !goal.completed } : goal
-      );
-    updateAllGoals(updatedGoals);
-  }, [targetUserId]);
+  const toggleGoal = useCallback(async (id: string) => {
+    const goal = goals.find((g) => g.id === id);
+    if (!goal) return;
+    const nextValue = !goal.completed;
+    setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, completed: nextValue } : g)));
+    const { error } = await getSupabase().from('goals').update({ completed: nextValue }).eq('id', id);
+    if (error) console.error('Failed to update goal:', error);
+  }, [goals]);
 
   return { goals, addGoal, removeGoal, toggleGoal, isInitialized };
 }
-
-    

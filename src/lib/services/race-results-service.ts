@@ -1,62 +1,83 @@
 'use client';
 import type { RaceResult } from '@/lib/types';
+import { getSupabase } from '@/lib/supabase/client';
 
-const RACE_RESULTS_KEY = 'aquaSpeed-race-results';
+const COLUMNS = 'id, swimmer_id, event, total_time_ms, unit, laps, country, meet_id, round, created_at, profiles(name)';
 
-function getLocalRaceResults(): RaceResult[] {
-  if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem(RACE_RESULTS_KEY);
-  return stored ? JSON.parse(stored) : [];
-}
-
-function saveLocalRaceResults(results: RaceResult[]) {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(RACE_RESULTS_KEY, JSON.stringify(results));
-  }
-}
-
-const listeners: Set<(results: RaceResult[]) => void> = new Set();
-
-export function subscribeToRaceResults(onUpdate: (results: RaceResult[]) => void) {
-  listeners.add(onUpdate);
-  onUpdate(getLocalRaceResults());
-  return () => {
-    listeners.delete(onUpdate);
+export function mapRaceResult(row: any): RaceResult {
+  return {
+    id: row.id,
+    date: row.created_at,
+    totalTime: row.total_time_ms,
+    unit: row.unit,
+    laps: row.laps ?? [],
+    event: row.event,
+    swimmerId: row.swimmer_id,
+    country: row.country ?? undefined,
+    meetId: row.meet_id ?? undefined,
+    round: row.round ?? undefined,
+    swimmerName: row.profiles?.name ?? undefined,
   };
 }
 
-function notifyListeners() {
-  const results = getLocalRaceResults();
-  listeners.forEach((listener) => listener(results));
+export interface RaceResultQuery {
+  swimmerId?: string;
+  country?: string;
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
 }
 
-export async function addRaceResult(result: Omit<RaceResult, 'id' | 'date'>): Promise<RaceResult> {
-  const results = getLocalRaceResults();
-  const newResult: RaceResult = {
-    ...result,
-    id: 'race_' + Math.random().toString(36).substring(2, 9),
-    date: new Date().toISOString(),
-  };
-  results.push(newResult);
-  saveLocalRaceResults(results);
-  notifyListeners();
-  return newResult;
+export async function queryRaceResults(q: RaceResultQuery = {}): Promise<RaceResult[]> {
+  let query = getSupabase().from('race_results').select(COLUMNS);
+  if (q.swimmerId) query = query.eq('swimmer_id', q.swimmerId);
+  if (q.country) query = query.eq('country', q.country);
+  if (q.startDate) query = query.gte('created_at', q.startDate.toISOString());
+  if (q.endDate) query = query.lte('created_at', q.endDate.toISOString());
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(q.limit ?? 1000);
+  if (error) throw error;
+  return (data ?? []).map(mapRaceResult);
+}
+
+/** Adds a time-trial / PB result for the signed-in swimmer. */
+export async function addRaceResult(
+  result: Pick<RaceResult, 'event' | 'totalTime' | 'laps'> & { unit?: RaceResult['unit'] }
+): Promise<RaceResult> {
+  const supabase = getSupabase();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('You must be logged in.');
+
+  const { data, error } = await supabase
+    .from('race_results')
+    .insert({
+      swimmer_id: auth.user.id,
+      event: result.event,
+      total_time_ms: Math.round(result.totalTime),
+      unit: result.unit ?? 'meters',
+      laps: (result.laps ?? []).map((l) => Math.round(l)),
+    })
+    .select(COLUMNS)
+    .single();
+  if (error) throw error;
+  return mapRaceResult(data);
 }
 
 export async function getRaceResults(country?: string): Promise<RaceResult[]> {
-  const results = getLocalRaceResults();
-  const filtered = country ? results.filter((r) => r.country === country) : results;
-  return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return queryRaceResults({ country });
 }
 
+/** All results, fastest first (used for event rankings). */
 export async function getAllRaceResults(): Promise<RaceResult[]> {
-  const results = getLocalRaceResults();
-  return results.sort((a, b) => a.totalTime - b.totalTime);
+  const { data, error } = await getSupabase()
+    .from('race_results')
+    .select(COLUMNS)
+    .order('total_time_ms', { ascending: true })
+    .limit(5000);
+  if (error) throw error;
+  return (data ?? []).map(mapRaceResult);
 }
 
 export async function removeRaceResult(id: string): Promise<void> {
-  let results = getLocalRaceResults();
-  results = results.filter((r) => r.id !== id);
-  saveLocalRaceResults(results);
-  notifyListeners();
+  const { error } = await getSupabase().from('race_results').delete().eq('id', id);
+  if (error) throw error;
 }

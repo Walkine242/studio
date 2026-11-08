@@ -25,8 +25,10 @@ import {
   DialogClose,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { useRaceResults } from '@/lib/hooks/use-race-results';
-import { useLocalRaceResults } from '@/lib/hooks/use-local-race-results';
+import { useRaceResults, useMyRaceResults } from '@/lib/hooks/use-race-results';
+import { useAuth } from '@/lib/auth/auth-provider';
+import { createParty } from '@/lib/services/party-service';
+import { useRouter } from 'next/navigation';
 import { useAllTimeBestByEvent } from '@/lib/hooks/use-all-time-best-by-event';
 import { useAllTimePoints } from '@/lib/hooks/use-all-time-points';
 import { formatTime } from '@/lib/utils';
@@ -53,6 +55,7 @@ function LeaderboardTable({ results, isInitialized }: { results: ReturnType<type
       <TableHeader>
         <TableRow>
           <TableHead className="w-16">Rank</TableHead>
+          <TableHead>Swimmer</TableHead>
           <TableHead>Time</TableHead>
           <TableHead>Event</TableHead>
           <TableHead>Date</TableHead>
@@ -61,7 +64,7 @@ function LeaderboardTable({ results, isInitialized }: { results: ReturnType<type
       <TableBody>
         {!isInitialized ? (
           <TableRow>
-            <TableCell colSpan={4} className="text-center h-24">
+            <TableCell colSpan={5} className="text-center h-24">
               <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
             </TableCell>
           </TableRow>
@@ -78,6 +81,9 @@ function LeaderboardTable({ results, isInitialized }: { results: ReturnType<type
                     <span>{rank}</span>
                   </div>
                 </TableCell>
+                <TableCell>
+                  <Link href={`/profile/${result.swimmerId}`} className="hover:underline">{result.swimmerName ?? 'Swimmer'}</Link>
+                </TableCell>
                 <TableCell className="font-mono font-semibold text-primary text-lg">
                   {formatTime(result.totalTime)}
                 </TableCell>
@@ -88,7 +94,7 @@ function LeaderboardTable({ results, isInitialized }: { results: ReturnType<type
           })
         ) : (
           <TableRow>
-            <TableCell colSpan={4} className="text-center h-24">
+            <TableCell colSpan={5} className="text-center h-24">
               No races recorded for this league and year.
             </TableCell>
           </TableRow>
@@ -98,7 +104,7 @@ function LeaderboardTable({ results, isInitialized }: { results: ReturnType<type
   )
 }
 
-function LeagueLeaderboardDisplay({ title, description, useDataHook, isCountryScoped, isGlobalScoped }: { title: string, description: string, useDataHook: typeof useRaceResults | typeof useLocalRaceResults, isCountryScoped?: boolean, isGlobalScoped?: boolean }) {
+function LeagueLeaderboardDisplay({ title, description, useDataHook, isCountryScoped, isGlobalScoped }: { title: string, description: string, useDataHook: typeof useRaceResults | typeof useMyRaceResults, isCountryScoped?: boolean, isGlobalScoped?: boolean }) {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(Math.max(currentYear, 2027));
   const [selectedLeague, setSelectedLeague] = useState<string>('summer');
@@ -163,8 +169,10 @@ function LeagueLeaderboardDisplay({ title, description, useDataHook, isCountrySc
 
 function AllTimeBestByEventLeaderboard() {
     const { bestTimes, isInitialized } = useAllTimeBestByEvent();
-    const { profile: currentUser } = useUserProfile();
+    const { user } = useAuth();
+    const router = useRouter();
     const { toast } = useToast();
+    const [isSending, setIsSending] = useState(false);
     const [isDualDialogOpen, setIsDualDialogOpen] = useState(false);
     const [dualEvent, setDualEvent] = useState('');
     const [dualUnit, setDualUnit] = useState<Unit>('meters');
@@ -180,7 +188,8 @@ function AllTimeBestByEventLeaderboard() {
         }, {} as Record<string, typeof bestTimes>);
     }, [bestTimes]);
 
-    const handleRequestDual = () => {
+    // Opens a private race for the chosen event; share the lobby link with the swimmer you're challenging.
+    const handleRequestDual = async () => {
         if (!dualEvent || !challengedSwimmer) {
             toast({
                 variant: 'destructive',
@@ -189,19 +198,25 @@ function AllTimeBestByEventLeaderboard() {
             });
             return;
         }
-
-        toast({
-            title: 'Dual Requested!',
-            description: `A challenge for ${dualEvent} has been sent to ${challengedSwimmer.name}. They have 24 hours to accept.`,
-        });
-        setIsDualDialogOpen(false);
-        setDualEvent('');
-        setChallengedSwimmer(null);
+        setIsSending(true);
+        try {
+            const party = await createParty({ event: dualEvent, isPublic: false });
+            toast({
+                title: 'Dual Created!',
+                description: `Share the lobby link with ${challengedSwimmer.name} to start racing.`,
+            });
+            setIsDualDialogOpen(false);
+            setDualEvent('');
+            setChallengedSwimmer(null);
+            router.push(`/dual/invite/${party.id}`);
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Could Not Create Dual', description: error instanceof Error ? error.message : 'Please try again.' });
+        } finally {
+            setIsSending(false);
+        }
     }
 
     const swimEvents = dualUnit === 'meters' ? METER_EVENTS : YARD_EVENTS;
-    const currentUserRank = currentUser ? (bestTimes.find(t => t.swimmerId === currentUser.name)?.totalTime) : undefined;
-    const isHigherRankChallenge = challengedSwimmer && currentUserRank && currentUserRank > (bestTimes.find(t => t.swimmerId === challengedSwimmer.id)?.totalTime || 0);
 
     return (
         <Card className="shadow-lg w-full">
@@ -228,9 +243,9 @@ function AllTimeBestByEventLeaderboard() {
                                <Fragment key={event}>
                                 {records.map((record, index) => {
                                     const rank = index + 1;
-                                    const isCurrentUser = record.swimmerId === currentUser?.name;
+                                    const isCurrentUser = record.swimmerId === user?.id;
                                     return (
-                                        <TableRow key={record.swimmerId}>
+                                        <TableRow key={`${event}-${record.swimmerId}`}>
                                             {index === 0 && <TableCell rowSpan={records.length} className="font-semibold align-top">{event}</TableCell>}
                                             <TableCell className="font-bold">{rank}</TableCell>
                                             <TableCell>
@@ -268,18 +283,9 @@ function AllTimeBestByEventLeaderboard() {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Request a Dual with {challengedSwimmer?.name}</DialogTitle>
-                        <CardDescription>Select an event for the challenge. They will have 24 hours to accept.</CardDescription>
+                        <CardDescription>Pick an event. We'll open a private race and give you a link to send them.</CardDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
-                        {isHigherRankChallenge && (
-                             <div className="flex items-center text-sm p-3 bg-accent/20 text-accent-foreground rounded-lg border border-accent/50">
-                                <Flame className="size-5 mr-3 text-accent" />
-                                <div>
-                                    <p className="font-bold">Double Points Challenge!</p>
-                                    <p>Win against this higher-ranked swimmer for 2x points.</p>
-                                </div>
-                            </div>
-                        )}
                         <Tabs value={dualUnit} onValueChange={(value) => setDualUnit(value as Unit)} className="w-full">
                             <TabsList className="grid w-full grid-cols-2">
                                 <TabsTrigger value="meters">Meters</TabsTrigger>
@@ -296,17 +302,14 @@ function AllTimeBestByEventLeaderboard() {
                             ))}
                             </SelectContent>
                         </Select>
-                         <div className="flex items-center text-sm text-muted-foreground p-3 bg-muted rounded-lg">
-                            <Clock className="size-4 mr-2" />
-                            <span>The challenge will expire in 24 hours if not accepted.</span>
-                        </div>
+
                     </div>
                     <DialogFooter>
                         <DialogClose asChild>
                             <Button type="button" variant="outline">Cancel</Button>
                         </DialogClose>
-                        <Button type="button" onClick={handleRequestDual} disabled={!dualEvent}>
-                            <Send className="mr-2"/> Send Challenge
+                        <Button type="button" onClick={handleRequestDual} disabled={!dualEvent || isSending}>
+                            <Send className="mr-2"/> Create Dual
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -356,7 +359,7 @@ function AllTimePointsLeaderboard() {
                                         </TableCell>
                                         <TableCell>
                                              <Link href={`/profile/${swimmer.swimmer}`} className="hover:underline">
-                                                {swimmer.swimmer}
+                                                {swimmer.name}
                                             </Link>
                                         </TableCell>
                                         <TableCell>{swimmer.races}</TableCell>
@@ -407,7 +410,7 @@ export default function LeaderboardPage() {
                      <LeagueLeaderboardDisplay
                         title="Your League Standings"
                         description="Your personal bests for each event within the selected league."
-                        useDataHook={useLocalRaceResults as any}
+                        useDataHook={useMyRaceResults as any}
                      />
                      <LeagueLeaderboardDisplay
                         title="Country League Standings"

@@ -40,8 +40,7 @@ export default function InvitePage({ params }: { params: Promise<{ partyId: stri
       setIsLoading(false);
     });
 
-    const userFriends = getFriends();
-    setFriends(userFriends);
+    getFriends().then(setFriends);
 
     return () => unsubscribe();
   }, [partyId, router, toast]);
@@ -57,19 +56,24 @@ export default function InvitePage({ params }: { params: Promise<{ partyId: stri
     }
   };
 
-  const handleInviteToggle = (friendId: string) => {
-    const isAlreadyInvited = invited.includes(friendId);
-    
-    // Simulate sending/retracting invitation
-    if (isAlreadyInvited) {
-        setInvited(prev => prev.filter(id => id !== friendId));
-    } else {
-        setInvited(prev => [...prev, friendId]);
-        const friend = friends.find(f => f.id === friendId);
+  // There is no in-app messaging yet, so "Invite" copies the lobby link
+  // for you to send to that friend however you usually reach them.
+  const handleInviteToggle = async (friendId: string) => {
+    const friend = friends.find(f => f.id === friendId);
+    const inviteLink = `${window.location.origin}/dual/lobby/${partyId}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Join my Dual race', text: `Race me in ${party?.event}!`, url: inviteLink });
+      } else {
+        await navigator.clipboard.writeText(inviteLink);
         toast({
-            title: 'Invitation Sent',
-            description: `An invite to join "${party?.event}" has been sent to ${friend?.name}.`
-        })
+          title: 'Invite Link Copied',
+          description: `Send it to ${friend?.name} so they can join "${party?.event}".`,
+        });
+      }
+      setInvited(prev => (prev.includes(friendId) ? prev : [...prev, friendId]));
+    } catch {
+      // Share sheet dismissed: nothing to do.
     }
   }
 
@@ -94,7 +98,7 @@ export default function InvitePage({ params }: { params: Promise<{ partyId: stri
         <CardHeader>
           <CardTitle>Friends List</CardTitle>
           <CardDescription>
-            Click to send an invitation. They'll receive a notification to join.
+            Swimmers you follow. Tap Invite to share the lobby link with them.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -120,7 +124,7 @@ export default function InvitePage({ params }: { params: Promise<{ partyId: stri
                                 <Button size="sm" variant={isInvited ? "secondary" : "default"} onClick={() => handleInviteToggle(friend.id)}>
                                     {isInvited ? (
                                         <>
-                                            <Check className="mr-2"/> Invited
+                                            <Check className="mr-2"/> Shared
                                         </>
                                     ) : (
                                          <>
@@ -133,7 +137,7 @@ export default function InvitePage({ params }: { params: Promise<{ partyId: stri
                     })}
                 </ul>
             ) : (
-                <p className="text-center text-muted-foreground">You don't have any friends yet. Go to a swimmer's profile to follow them!</p>
+                <p className="text-center text-muted-foreground">You aren't following anyone yet. Search for swimmers on your Profile page's Friends tab to follow them.</p>
             )}
         </CardContent>
       </Card>
