@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -66,49 +66,8 @@ import {
   type ConnectedDeviceKey
 } from '@/lib/hooks/use-connected-devices';
 import { ConnectDeviceModal } from '@/components/connect-device-modal';
-
-const PRESET_WEARABLE_ACTIVITIES = [
-  {
-    title: 'Morning Swim Practice - 4,000m Main Set',
-    source: 'apple-watch' as ConnectedDeviceKey,
-    location: 'Aquatic Center (50m Pool)',
-    distance: '4,000 m',
-    duration: '1h 05m',
-    avgPace: '1:18 /100m',
-  },
-  {
-    title: 'FORM Smart Goggles - Interval & Threshold Practice',
-    source: 'form-goggles' as ConnectedDeviceKey,
-    location: 'University Natatorium (25yd)',
-    distance: '3,500 yd',
-    duration: '52m 30s',
-    avgPace: '1:14 /100yd',
-  },
-  {
-    title: 'Garmin Swim 2 - Open Water Endurance Practice',
-    source: 'garmin' as ConnectedDeviceKey,
-    location: 'Lake Open Water 2.5k',
-    distance: '2,500 m',
-    duration: '42m 15s',
-    avgPace: '1:24 /100m',
-  },
-  {
-    title: 'Fitbit Sense 2 - Sprint & Kick Practice',
-    source: 'fitbit' as ConnectedDeviceKey,
-    location: 'YMCA Pool (25yd)',
-    distance: '2,800 yd',
-    duration: '45m 00s',
-    avgPace: '1:20 /100yd',
-  },
-  {
-    title: 'Polar Vantage V3 - VO2 Max Swim Practice',
-    source: 'polar' as ConnectedDeviceKey,
-    location: 'Olympic Training Pool',
-    distance: '3,200 m',
-    duration: '50m 10s',
-    avgPace: '1:16 /100m',
-  },
-];
+import { DeviceImport } from '@/components/device-import';
+import { SwimDetails } from '@/components/swim-details';
 
 const SourceIcon = ({ source }: { source: string }) => {
   switch (source) {
@@ -129,7 +88,8 @@ const SourceIcon = ({ source }: { source: string }) => {
 };
 
 export default function WorkoutLogsPage() {
-  const { workoutLogs, isInitialized, addWorkoutLog } = useWorkoutLogs({});
+  const { workoutLogs, isInitialized, addWorkoutLog, refetch } = useWorkoutLogs({});
+  const [openLogId, setOpenLogId] = useState<string | null>(null);
   const { toast } = useToast();
   const { devices, getConnectedList } = useConnectedDevices();
 
@@ -150,45 +110,19 @@ export default function WorkoutLogsPage() {
   const [manualPace, setManualPace] = useState('1:20 /100m');
   const [manualSource, setManualSource] = useState('apple-watch');
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('import')) {
+      setActiveSyncTab('wearable');
+      setIsSyncDialogOpen(true);
+    }
+  }, []);
+
   const handleOpenConnectModal = (key: ConnectedDeviceKey) => {
     setModalDeviceKey(key);
     setIsConnectModalOpen(true);
   };
 
   const activeConnectedKeys = getConnectedList();
-  const availableSyncActivities = PRESET_WEARABLE_ACTIVITIES.filter(
-    (act) => devices[act.source]?.connected
-  );
-
-  const handleSyncPresetActivity = (activity: typeof PRESET_WEARABLE_ACTIVITIES[0]) => {
-    setIsSyncing(true);
-    setSyncProgress(0);
-    const interval = setInterval(() => {
-      setSyncProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          addWorkoutLog({
-            title: activity.title,
-            date: new Date().toISOString().split('T')[0],
-            location: activity.location,
-            distance: activity.distance,
-            duration: activity.duration,
-            avgPace: activity.avgPace,
-            source: activity.source,
-          });
-          setIsSyncing(false);
-          setIsSyncDialogOpen(false);
-          toast({
-            title: 'Wearable Activity Synced!',
-            description: `Successfully imported "${activity.title}" from your ${DEVICE_METADATA[activity.source]?.name || 'device'}.`,
-          });
-          return 100;
-        }
-        return prev + 25;
-      });
-    }, 200);
-  };
-
   const handleSaveManualPractice = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualTitle.trim()) {
@@ -239,7 +173,7 @@ export default function WorkoutLogsPage() {
             Workout & Practice Logs
           </h1>
           <p className="text-blue-200/80 mt-1 text-sm">
-            Sync wearable swim devices (Garmin, Apple Watch, FORM Goggles, Fitbit, Polar) and manage your practice history.
+            Import swims from your watch (Garmin, Apple Watch, COROS, Suunto, Polar) or log a practice by hand.
           </p>
         </div>
 
@@ -248,24 +182,24 @@ export default function WorkoutLogsPage() {
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold shadow-lg shadow-cyan-500/20">
                 <RefreshCw className="mr-2 size-4" />
-                Sync Wearable / Record Practice
+                Import Swim / Record Practice
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl bg-slate-950 text-white border-slate-800">
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold flex items-center gap-2">
                   <Activity className="size-5 text-cyan-400" />
-                  Sync Wearables & Record Practice
+                  Import Swims & Record Practice
                 </DialogTitle>
                 <DialogDescription className="text-slate-400">
-                  Import recorded swim workouts directly from your authorized wearable sensors or manually log your practice sets.
+                  Upload the activity file from your watch, or log a practice set by hand.
                 </DialogDescription>
               </DialogHeader>
 
               <Tabs value={activeSyncTab} onValueChange={(val) => setActiveSyncTab(val as any)} className="w-full mt-2">
                 <TabsList className="grid grid-cols-2 bg-slate-900 border border-slate-800">
                   <TabsTrigger value="wearable" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white font-semibold">
-                    <Wifi className="mr-2 size-4" /> Wearable Auto Sync
+                    <Wifi className="mr-2 size-4" /> Import from Watch
                   </TabsTrigger>
                   <TabsTrigger value="manual" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white font-semibold">
                     <Plus className="mr-2 size-4" /> Record Practice Set
@@ -273,89 +207,10 @@ export default function WorkoutLogsPage() {
                 </TabsList>
 
                 <TabsContent value="wearable" className="space-y-4 pt-4">
-                  {isSyncing ? (
-                    <div className="flex flex-col items-center justify-center py-10 gap-4">
-                      <div className="relative size-16 rounded-full border-4 border-dashed border-cyan-400 animate-spin flex items-center justify-center">
-                        <Smartphone className="size-8 text-cyan-400" />
-                      </div>
-                      <p className="text-cyan-300 font-semibold">Fetching telemetry from paired device...</p>
-                      <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden max-w-xs">
-                        <div className="bg-gradient-to-r from-cyan-400 to-blue-500 h-full transition-all duration-300" style={{ width: `${syncProgress}%` }} />
-                      </div>
-                      <span className="text-xs text-slate-400">{syncProgress}% Complete</span>
-                    </div>
-                  ) : availableSyncActivities.length > 0 ? (
-                    <div className="space-y-3">
-                      <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Recent Activities Ready to Sync from Connected Devices</p>
-                      <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                        {availableSyncActivities.map((activity, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-3 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-cyan-500/50 transition-all"
-                          >
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <SourceIcon source={activity.source} />
-                                <span className="font-bold text-sm text-slate-100">{activity.title}</span>
-                              </div>
-                              <div className="flex items-center gap-3 text-xs text-slate-400">
-                                <span><MapPin className="inline size-3 mr-1" />{activity.location}</span>
-                                <span><Clock className="inline size-3 mr-1" />{activity.duration}</span>
-                                <span className="font-mono text-cyan-400">{activity.distance} @ {activity.avgPace}</span>
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={() => handleSyncPresetActivity(activity)}
-                              className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs"
-                            >
-                              Sync Now
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 px-4 rounded-xl border border-slate-800 bg-slate-900/40 space-y-3">
-                      <WifiOff className="size-10 text-slate-500 mx-auto" />
-                      <h4 className="font-bold text-slate-200 text-base">No Wearable Swim Devices Connected</h4>
-                      <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                        You have not paired any swim devices yet. Connect your Garmin, Apple Watch, or FORM Goggles below to enable telemetry syncing.
-                      </p>
-                      <div className="flex flex-wrap justify-center gap-2 pt-2">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setIsSyncDialogOpen(false);
-                            handleOpenConnectModal('garmin');
-                          }}
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
-                        >
-                          <Watch className="mr-1.5 size-3.5" /> Connect Garmin
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setIsSyncDialogOpen(false);
-                            handleOpenConnectModal('apple-watch');
-                          }}
-                          className="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs"
-                        >
-                          <AppleIcon className="mr-1.5 size-3.5" /> Connect Apple Watch
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setIsSyncDialogOpen(false);
-                            handleOpenConnectModal('form-goggles');
-                          }}
-                          className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs"
-                        >
-                          <Watch className="mr-1.5 size-3.5" /> Connect FORM Goggles
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                  <DeviceImport
+                    defaultDevice="garmin"
+                    onDone={() => { refetch(); setIsSyncDialogOpen(false); }}
+                  />
                 </TabsContent>
 
                 <TabsContent value="manual" className="pt-4">
@@ -460,14 +315,14 @@ export default function WorkoutLogsPage() {
           <CardTitle className="text-lg flex items-center justify-between">
             <span className="flex items-center gap-2 text-white">
               <Watch className="size-5 text-cyan-400" />
-              Connected Wearables & Swim Devices
+              Import From Your Watch
             </span>
             <Badge variant="outline" className="border-cyan-500/30 text-cyan-400 font-mono text-xs">
-              {activeConnectedKeys.length} Active {activeConnectedKeys.length === 1 ? 'Connection' : 'Connections'}
+              .FIT · .TCX · Garmin .zip
             </Badge>
           </CardTitle>
           <CardDescription className="text-slate-400 text-xs">
-            Pair your swim watch or sensors to authorize direct automatic telemetry syncing.
+            Pick your device for step-by-step instructions, then upload the swim file. Automatic syncing is coming later.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -517,7 +372,7 @@ export default function WorkoutLogsPage() {
                         <CheckCircle2 className="size-3.5" /> Connected
                       </span>
                     ) : (
-                      <span>Connect {meta.brand}</span>
+                      <span>Import {meta.brand}</span>
                     )}
                   </Button>
                 </div>
@@ -556,7 +411,7 @@ export default function WorkoutLogsPage() {
               <Activity className="size-12 text-slate-600 mx-auto" />
               <h3 className="text-lg font-bold text-slate-200">No Recorded Swim Activities Yet</h3>
               <p className="text-sm text-slate-400 max-w-md mx-auto">
-                Connect your Garmin, Apple Watch, or FORM Smart Goggles above to automatically sync your practice sets, or log an activity manually.
+                Automatic device sync is coming soon. For now, log an activity manually.
               </p>
               <Button
                 onClick={() => setIsSyncDialogOpen(true)}
@@ -581,7 +436,11 @@ export default function WorkoutLogsPage() {
                 </TableHeader>
                 <TableBody>
                   {workoutLogs.map((log) => (
-                    <TableRow key={log.id} className="border-slate-800 hover:bg-slate-800/40">
+                    <Fragment key={log.id}>
+                    <TableRow
+                      className={`border-slate-800 hover:bg-slate-800/40 ${log.details ? 'cursor-pointer' : ''}`}
+                      onClick={() => log.details && setOpenLogId(openLogId === log.id ? null : log.id)}
+                    >
                       <TableCell className="text-slate-300 whitespace-nowrap">
                         {new Date(log.date).toLocaleDateString(undefined, {
                           timeZone: 'UTC',
@@ -590,7 +449,12 @@ export default function WorkoutLogsPage() {
                           year: 'numeric',
                         })}
                       </TableCell>
-                      <TableCell className="font-semibold text-white">{log.title}</TableCell>
+                      <TableCell className="font-semibold text-white">
+                        {log.title}
+                        {log.details ? (
+                          <span className="ml-2 text-[11px] font-normal text-cyan-400">{openLogId === log.id ? 'Hide splits ▲' : 'Splits ▼'}</span>
+                        ) : null}
+                      </TableCell>
                       <TableCell className="text-slate-400">
                         <div className="flex items-center gap-1.5 text-xs">
                           <MapPin className="size-3 text-slate-400" />
@@ -607,6 +471,14 @@ export default function WorkoutLogsPage() {
                         </Badge>
                       </TableCell>
                     </TableRow>
+                    {openLogId === log.id && log.details ? (
+                      <TableRow className="border-slate-800 bg-slate-950/70 hover:bg-slate-950/70">
+                        <TableCell colSpan={7} className="p-3">
+                          <SwimDetails details={log.details} />
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
@@ -631,6 +503,7 @@ export default function WorkoutLogsPage() {
         open={isConnectModalOpen}
         onOpenChange={setIsConnectModalOpen}
         deviceKey={modalDeviceKey}
+        onSuccess={() => refetch()}
       />
     </div>
   );

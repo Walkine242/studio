@@ -40,7 +40,9 @@ import {
   DEVICE_METADATA,
   type ConnectedDeviceKey,
   type DeviceConnectionInfo,
+  WEARABLES_LIVE,
 } from '@/lib/hooks/use-connected-devices';
+import { DeviceImport } from '@/components/device-import';
 
 interface ConnectDeviceModalProps {
   open: boolean;
@@ -49,7 +51,7 @@ interface ConnectDeviceModalProps {
   onSuccess?: () => void;
 }
 
-export function ConnectDeviceModal({
+function LiveConnectDeviceModal({
   open,
   onOpenChange,
   deviceKey,
@@ -433,6 +435,34 @@ export function ConnectDeviceModal({
             </Button>
           </DialogFooter>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Device dialog. Automatic sync isn't available yet (Garmin has paused new API
+ * access), so it lets swimmers upload their watch's activity files instead.
+ */
+export function ConnectDeviceModal(props: ConnectDeviceModalProps) {
+  if (WEARABLES_LIVE) return <LiveConnectDeviceModal {...props} />;
+  const meta = props.deviceKey ? DEVICE_METADATA[props.deviceKey] : null;
+  return (
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl bg-slate-950 text-white border-slate-800">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Watch className="size-5 text-cyan-300" /> Import {meta ? `${meta.brand} ` : ''}swims
+          </DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Upload the activity file from your watch and Dual adds the swim to your training log with every lap, stroke and
+            heart-rate reading. Automatic syncing will come once watch makers open their connections to new apps.
+          </DialogDescription>
+        </DialogHeader>
+        <DeviceImport
+          defaultDevice={props.deviceKey ?? 'garmin'}
+          onDone={() => { props.onSuccess?.(); props.onOpenChange(false); }}
+        />
       </DialogContent>
     </Dialog>
   );

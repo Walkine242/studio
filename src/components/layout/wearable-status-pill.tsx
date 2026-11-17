@@ -99,7 +99,7 @@ export function WearableStatusPill() {
                   )}
                 </span>
               ) : (
-                <span className="text-slate-400 font-semibold">Wearables Off</span>
+                <span className="text-slate-300 font-semibold">Import Swims</span>
               )}
             </span>
           </Button>
@@ -162,9 +162,9 @@ export function WearableStatusPill() {
           ) : (
             <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800 text-center space-y-2">
               <Watch className="size-8 text-slate-600 mx-auto" />
-              <p className="text-xs text-slate-300 font-medium">No Wearable Swim Sensors Paired</p>
+              <p className="text-xs text-slate-300 font-medium">Bring in swims from your watch</p>
               <p className="text-[11px] text-slate-500">
-                Connect Garmin, Apple Watch, FORM Smart Goggles, Fitbit, Polar, Suunto, or Coros for automatic race telemetry & practice tracking.
+                Upload a swim file from Garmin, Apple Watch, COROS, Suunto or Polar and Dual adds it to your training log with every lap and stroke.
               </p>
             </div>
           )}
@@ -188,8 +188,8 @@ export function WearableStatusPill() {
               size="sm"
               className="w-full border-slate-800 hover:bg-slate-900 text-slate-300 hover:text-white text-xs h-8 flex items-center justify-between"
             >
-              <Link href="/profile?tab=wearables">
-                <span>Manage Devices in Profile</span>
+              <Link href="/training/logs?import=1">
+                <span>Import a Swim</span>
                 <ChevronRight className="size-3.5 text-slate-400" />
               </Link>
             </Button>

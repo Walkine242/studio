@@ -461,7 +461,7 @@ export default function WorkoutGeneratorPage() {
                         }}
                         className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold text-xs h-10 shadow-lg"
                       >
-                        <Bluetooth className="mr-2 size-4" /> Connect Wearable Swim Sensor
+                        <Bluetooth className="mr-2 size-4" /> Import Swims from Your Watch
                       </Button>
                       <Button
                         variant="outline"
@@ -535,7 +535,7 @@ export default function WorkoutGeneratorPage() {
                         }}
                         className="mt-4 border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/60 font-semibold text-xs h-8"
                       >
-                        <Bluetooth className="size-3.5 mr-1.5" /> Pair Heart Rate Monitor
+                        <Bluetooth className="size-3.5 mr-1.5" /> Import Swims from Your Watch
                       </Button>
                     )}
 

@@ -102,6 +102,13 @@ export const DEVICE_METADATA: Record<
   },
 };
 
+/**
+ * Real device integrations (Garmin, Apple Health, Bluetooth sensors...) aren't
+ * built yet. While false, no device can be "connected" and the connect screens
+ * say "Coming soon" instead of simulating a pairing.
+ */
+export const WEARABLES_LIVE = false;
+
 export function useConnectedDevices() {
   const [devices, setDevices] = useState<ConnectedDevicesState>(DEFAULT_DEVICE_STATE);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -112,6 +119,11 @@ export function useConnectedDevices() {
       setIsBleSupported('bluetooth' in navigator);
     }
     try {
+      if (!WEARABLES_LIVE) {
+        // Clear any simulated pairings saved by older versions of the app.
+        localStorage.removeItem(CONNECTED_DEVICES_STORAGE_KEY);
+        return;
+      }
       const stored = localStorage.getItem(CONNECTED_DEVICES_STORAGE_KEY);
       if (stored) {
         setDevices(JSON.parse(stored));
@@ -142,6 +154,7 @@ export function useConnectedDevices() {
       connectionType: 'cloud-api' | 'bluetooth-le' = 'cloud-api',
       extraInfo?: Partial<DeviceConnectionInfo>
     ) => {
+      if (!WEARABLES_LIVE) return;
       setDevices((prev) => {
         const meta = DEVICE_METADATA[key];
         const now = new Date().toISOString();
@@ -175,6 +188,7 @@ export function useConnectedDevices() {
 
   const pairBleDevice = useCallback(
     async (key: ConnectedDeviceKey): Promise<{ success: boolean; deviceName?: string; error?: string }> => {
+      if (!WEARABLES_LIVE) return { success: false, error: 'Device connections are coming soon.' };
       const meta = DEVICE_METADATA[key];
       if (typeof window !== 'undefined' && 'bluetooth' in navigator) {
         try {

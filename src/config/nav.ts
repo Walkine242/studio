@@ -15,6 +15,7 @@ import {
   Dumbbell,
   Anchor,
   Video,
+  Users,
 } from 'lucide-react';
 
 interface NavItem {
@@ -44,6 +45,7 @@ export const navItems: NavItemConfig[] = [
     items: [
       { href: '/leaderboard', label: 'League', icon: BarChart3, type: 'link' },
       { href: '/leaderboard/endurance', label: 'Endurance', icon: Anchor, type: 'link' },
+      { href: '/leaderboard/teams', label: 'Teams', icon: Users, type: 'link' },
     ]
   },
   {

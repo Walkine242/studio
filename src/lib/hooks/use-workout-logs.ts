@@ -16,6 +16,7 @@ function mapLog(row: any): WorkoutLog {
     avgPace: row.avg_pace ?? '',
     userId: row.user_id,
     location: row.location ?? undefined,
+    details: row.details ?? undefined,
   };
 }
 

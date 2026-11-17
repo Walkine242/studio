@@ -85,7 +85,7 @@ export function TeamBuilder() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Users className="size-5" /> My Team</CardTitle>
         <CardDescription>
-          Design your team logo. It shows on the Dual face-off screen when you race, and later other swimmers will be able to join your team.
+          Design your team logo. It shows on the Dual face-off screen for you and everyone who joins your team.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-8 md:grid-cols-[240px_1fr]">

@@ -89,7 +89,7 @@ import { getAllRaceResults } from '@/lib/services/race-results-service';
 import { useWorkoutLogs } from '@/lib/hooks/use-workout-logs';
 import { getFollowing, getFollowers, followSwimmer, unfollowSwimmer, removeFollower, searchSwimmers, type SwimmerListItem } from '@/lib/friends';
 import { useAuth } from '@/lib/auth/auth-provider';
-import { TeamBuilder } from '@/components/team/team-builder';
+import { TeamHub } from '@/components/team/team-hub';
 import { AppleIcon } from '../icons/apple';
 import { FitbitIcon } from '../icons/fitbit';
 import {
@@ -1586,7 +1586,7 @@ export function ProfileLayout({ profileData, isLoading, onProfileSave }: Profile
                 
                 {profileData.isCurrentUser && (
                     <TabsContent value="team" className="mt-6">
-                        <TeamBuilder />
+                        <TeamHub />
                     </TabsContent>
                 )}
 
@@ -1694,18 +1694,14 @@ function WearableDevicesManager() {
               <Watch className="size-6 text-cyan-400" /> Wearables & Swim Devices
             </CardTitle>
             <CardDescription className="text-slate-400 text-xs mt-1">
-              Connect your smartwatch, smart goggles, or heart rate sensors via Bluetooth LE or Cloud APIs to automatically capture split times and swim metrics.
+              Upload swims from your watch (.FIT, .TCX or Garmin export) to bring in every lap, stroke and heart-rate reading. Automatic syncing is coming later.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="border-slate-700 text-slate-300 text-xs px-3 py-1">
               {connectedList.length} / 7 Paired
             </Badge>
-            {isBleSupported && (
-              <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30 text-xs px-3 py-1 flex items-center gap-1">
-                <Bluetooth className="size-3" /> Web BLE Active
-              </Badge>
-            )}
+            <Badge className="bg-cyan-500/15 text-cyan-300 border-cyan-400/30 text-xs px-3 py-1">File import</Badge>
           </div>
         </div>
       </CardHeader>
@@ -1806,7 +1802,7 @@ function WearableDevicesManager() {
                       onClick={() => handlePair(key)}
                       className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold text-xs h-8"
                     >
-                      <Bluetooth className="size-3.5 mr-1.5" /> Pair & Connect Device
+                      <Bluetooth className="size-3.5 mr-1.5" /> Import Swims
                     </Button>
                   </div>
                 )}

@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Falls back to the plain profile if the teams migration hasn't been run yet.
     let res: { data: any; error: unknown } = await supabase
       .from('profiles')
-      .select('*, team:teams!profiles_team_id_fkey(id, name, abbr, logo)')
+      .select('*, team:teams!profiles_team_id_fkey(id, owner_id, name, abbr, logo)')
       .eq('id', uid)
       .maybeSingle();
     if (res.error) res = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();

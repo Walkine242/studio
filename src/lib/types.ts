@@ -10,6 +10,8 @@ export interface WorkoutLog {
     avgPace: string;
     userId: string;
     location?: string;
+    /** Laps, strokes and heart rate for swims imported from a watch. */
+    details?: unknown;
 }
 
 

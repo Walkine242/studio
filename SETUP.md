@@ -9,7 +9,9 @@ About 30 minutes. You'll need accounts on Supabase, Anthropic, Stripe and Vercel
 3. Paste the entire contents of `supabase/migrations/20261025000000_init.sql` and click **Run**. It should finish with "Success".
    Then open a new query, paste `supabase/migrations/20261026000000_trial_and_welcome.sql` and **Run** it too (free trial + welcome email). To change the trial length, edit `interval '14 days'` in that file before running it.
    Then run `supabase/migrations/20261027000000_avatar.sql` and finally
-   `supabase/migrations/20261108000000_teams.sql` (team names and logos shown on the Dual face-off screen).
+   `supabase/migrations/20261108000000_teams.sql` (team names and logos shown on the Dual face-off screen),
+   `supabase/migrations/20261117000000_team_joining.sql` (joining teams, team leaderboard) and
+   `supabase/migrations/20261117010000_device_imports.sql` (swims imported from watches).
 4. Open **Project Settings → API** and copy:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon` `public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
