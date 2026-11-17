@@ -37,7 +37,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-.genkit/*
+# env files (keep secrets out of git)
+.env
+.env*.local
 .env*
 
 # firebase
@@ -45,3 +47,6 @@ firebase-debug.log
 firestore-debug.log
 .vercel
 .env*
+
+# example env file is safe to commit
+!.env.example

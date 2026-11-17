@@ -10,12 +10,30 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { createParty } from '@/lib/services/party-service';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 
 type Unit = 'meters' | 'yards';
+type Stroke = 'Freestyle' | 'Backstroke' | 'Breaststroke' | 'Butterfly' | 'IM';
+type RaceType = 'Swim' | 'Kick' | 'Drill';
 
-const RACE_TYPES = ['Kick', 'Drill', 'Swim'];
+const STROKES: { name: Stroke; short: string }[] = [
+  { name: 'Freestyle', short: 'FR' },
+  { name: 'Backstroke', short: 'BK' },
+  { name: 'Breaststroke', short: 'BR' },
+  { name: 'Butterfly', short: 'FL' },
+  { name: 'IM', short: 'IM' },
+];
+
+const RACE_TYPES: { name: RaceType; description: string }[] = [
+  { name: 'Swim', description: 'Full stroke' },
+  { name: 'Kick', description: 'Legs only' },
+  { name: 'Drill', description: 'Technique drill' },
+];
+
 const METER_DISTANCES = [25, 50, 100, 200, 400, 800, 1500];
 const YARD_DISTANCES = [25, 50, 100, 200, 500, 1000, 1650];
+// An IM needs one length of each stroke per quarter, so only these distances work.
+const IM_DISTANCES = [100, 200, 400];
 
 const EQUIPMENT_OPTIONS = [
   'Buoy',
@@ -31,32 +49,43 @@ const EQUIPMENT_OPTIONS = [
   'Ankle Band'
 ];
 
-
 export default function CustomDualPage() {
-  const [event, setEvent] = useState<string>('');
+  const [stroke, setStroke] = useState<Stroke>('Freestyle');
+  const [raceType, setRaceType] = useState<RaceType>('Swim');
   const [distance, setDistance] = useState<string>('');
   const [unit, setUnit] = useState<Unit>('meters');
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
+  const [creating, setCreating] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
+  const baseDistances = unit === 'meters' ? METER_DISTANCES : YARD_DISTANCES;
+  const distances = stroke === 'IM' ? IM_DISTANCES : baseDistances;
+  const unitString = unit === 'meters' ? 'm' : 'yd';
+
+  const eventName = distance
+    ? `${distance}${unitString} ${stroke}${raceType !== 'Swim' ? ` ${raceType}` : ''}${selectedEquipment.length > 0 ? ` - with ${selectedEquipment.join(', ')}` : ''}`
+    : '';
+
   const handleEquipmentChange = (equipment: string) => {
-    setSelectedEquipment(prev => 
-      prev.includes(equipment) 
+    setSelectedEquipment(prev =>
+      prev.includes(equipment)
         ? prev.filter(item => item !== equipment)
         : [...prev, equipment]
     );
   };
 
+  const handleStrokeChange = (next: Stroke) => {
+    setStroke(next);
+    if (next === 'IM' && distance && !IM_DISTANCES.includes(Number(distance))) setDistance('');
+  };
+
+  const handleUnitChange = (value: string) => {
+    setUnit(value as Unit);
+    setDistance('');
+  };
+
   const handleCreateParty = async () => {
-    if (!event) {
-      toast({
-        variant: 'destructive',
-        title: 'Select a Race Type',
-        description: 'You must choose a type for the custom dual.',
-      });
-      return;
-    }
     if (!distance) {
       toast({
         variant: 'destructive',
@@ -65,103 +94,140 @@ export default function CustomDualPage() {
       });
       return;
     }
-    
-    const unitString = unit === 'meters' ? 'm' : 'yd';
-    const customEvent = `${distance}${unitString} ${event}${selectedEquipment.length > 0 ? ` - with ${selectedEquipment.join(', ')}` : ''}`;
 
-
+    setCreating(true);
     try {
-      const newParty = await createParty({ event: customEvent, isPublic: false });
+      const newParty = await createParty({ event: eventName, isPublic: false });
       toast({
         title: 'Party Created!',
         description: 'Next, invite your friends to the race.',
       });
       router.push(`/dual/invite/${newParty.id}`);
     } catch (error) {
-       console.error('Error creating party:', error);
-       toast({
+      console.error('Error creating party:', error);
+      toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Could not create a party. Please try again.',
+        description: error instanceof Error ? error.message : 'Could not create a party. Please try again.',
       });
+      setCreating(false);
     }
   };
-  
-  const handleUnitChange = (value: string) => {
-    setUnit(value as Unit);
-    setDistance(''); // Reset distance when unit changes
-  }
-
-  const distances = unit === 'meters' ? METER_DISTANCES : YARD_DISTANCES;
 
   return (
     <div className="container mx-auto max-w-xl space-y-8">
-       <div className="text-center">
-          <h1 className="mt-4 font-headline text-3xl font-bold">Create a Custom Dual</h1>
-          <p className="mt-2 text-muted-foreground">Set up your own private custom race for friends to join.</p>
-        </div>
-        <Card>
-            <CardHeader>
-                <CardTitle>Race Settings</CardTitle>
-                <CardDescription>
-                  Choose the type, distance, and unit for your custom dual. This will create a private party.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                 <Tabs value={unit} onValueChange={handleUnitChange} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="meters">Meters</TabsTrigger>
-                        <TabsTrigger value="yards">Yards</TabsTrigger>
-                    </TabsList>
-                </Tabs>
-                <div className="grid grid-cols-2 gap-4">
-                  <Select onValueChange={setDistance} value={distance}>
-                      <SelectTrigger>
-                          <SelectValue placeholder="Distance" />
-                      </SelectTrigger>
-                      <SelectContent>
-                          {distances.map((d) => (
-                          <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
-                          ))}
-                      </SelectContent>
-                  </Select>
-                  <Select onValueChange={setEvent} value={event}>
-                      <SelectTrigger>
-                          <SelectValue placeholder="Race Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                          {RACE_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>{type}</SelectItem>
-                          ))}
-                      </SelectContent>
-                  </Select>
-                </div>
+      <div className="text-center">
+        <h1 className="mt-4 font-headline text-3xl font-bold">Create a Custom Dual</h1>
+        <p className="mt-2 text-muted-foreground">Set up your own private custom race for friends to join.</p>
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Race Settings</CardTitle>
+          <CardDescription>
+            Choose the stroke, type, distance, and unit for your custom dual. This will create a private party.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Tabs value={unit} onValueChange={handleUnitChange} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="meters">Meters</TabsTrigger>
+              <TabsTrigger value="yards">Yards</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-                {event && (
-                  <div>
-                    <h3 className="mb-4 text-lg font-medium">Select Equipment (Optional)</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      {EQUIPMENT_OPTIONS.map((item) => (
-                        <div key={item} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={item}
-                            onCheckedChange={() => handleEquipmentChange(item)}
-                            checked={selectedEquipment.includes(item)}
-                          />
-                          <Label htmlFor={item} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                            {item}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                <Button onClick={handleCreateParty} className="w-full">
-                    <Plus className="mr-2"/> Create Private Party
-                </Button>
-            </CardContent>
-        </Card>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold">Stroke</h3>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {STROKES.map((s) => (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => handleStrokeChange(s.name)}
+                  aria-pressed={stroke === s.name}
+                  className={cn(
+                    'flex flex-col items-center justify-center rounded-lg border px-2 py-3 text-sm transition-colors',
+                    stroke === s.name
+                      ? 'border-primary bg-primary text-primary-foreground shadow'
+                      : 'border-input bg-background hover:bg-muted'
+                  )}
+                >
+                  <span className="text-lg font-extrabold tracking-wider">{s.short}</span>
+                  <span className="text-xs">{s.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold">Race Type</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {RACE_TYPES.map((t) => (
+                <button
+                  key={t.name}
+                  type="button"
+                  onClick={() => setRaceType(t.name)}
+                  aria-pressed={raceType === t.name}
+                  className={cn(
+                    'flex flex-col items-center rounded-lg border px-2 py-2 text-sm transition-colors',
+                    raceType === t.name
+                      ? 'border-primary bg-primary text-primary-foreground shadow'
+                      : 'border-input bg-background hover:bg-muted'
+                  )}
+                >
+                  <span className="font-bold">{t.name}</span>
+                  <span className="text-xs opacity-80">{t.description}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold">Distance</h3>
+            <Select onValueChange={setDistance} value={distance}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a distance" />
+              </SelectTrigger>
+              <SelectContent>
+                {distances.map((d) => (
+                  <SelectItem key={d} value={d.toString()}>{d} {unitString}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {stroke === 'IM' && (
+              <p className="text-xs text-muted-foreground">IM races are 100, 200 or 400 so each stroke gets an equal share.</p>
+            )}
+          </div>
+
+          <div>
+            <h3 className="mb-4 text-sm font-semibold">Equipment (Optional)</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {EQUIPMENT_OPTIONS.map((item) => (
+                <div key={item} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={item}
+                    onCheckedChange={() => handleEquipmentChange(item)}
+                    checked={selectedEquipment.includes(item)}
+                  />
+                  <Label htmlFor={item} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    {item}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {eventName && (
+            <div className="rounded-lg bg-muted p-3 text-center">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground">Your race</span>
+              <p className="font-headline text-lg font-bold">{eventName}</p>
+            </div>
+          )}
+
+          <Button onClick={handleCreateParty} className="w-full" disabled={creating}>
+            <Plus className="mr-2" /> {creating ? 'Creating...' : 'Create Private Party'}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,75 +1,87 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import type { RaceResult } from '@/lib/types';
-import { 
-  addRaceResult as addRaceResultService, 
+import {
+  addRaceResult as addRaceResultService,
   removeRaceResult as removeRaceResultService,
-  subscribeToRaceResults
+  queryRaceResults,
 } from '@/lib/services/race-results-service';
-import { useLocalRaceResults } from './use-local-race-results';
-import { getUserId as getCurrentUserId, useUserProfile } from '@/lib/hooks/use-user-profile';
+import { useAuth } from '@/lib/auth/auth-provider';
 
-export function useRaceResults({ userId, dateRange, country, global }: { userId?: string, dateRange?: { startDate: Date, endDate: Date }, country?: string, global?: boolean }) {
+interface Options {
+  userId?: string;
+  dateRange?: { startDate: Date; endDate: Date };
+  country?: string;
+  global?: boolean;
+  /** Only the signed-in swimmer's own results. */
+  mine?: boolean;
+}
+
+export function useRaceResults({ userId, dateRange, country, global, mine }: Options = {}) {
   const [raceResults, setRaceResults] = useState<RaceResult[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
-  const { addRaceResult: addLocalRaceResult } = useLocalRaceResults();
-  const { profile } = useUserProfile();
+  const startTs = dateRange?.startDate.getTime();
+  const endTs = dateRange?.endDate.getTime();
+
+  const { user } = useAuth();
+  const swimmerId = mine ? user?.id : country || global ? undefined : userId;
+  const blocked = mine && !swimmerId;
+
+  const load = useCallback(async () => {
+    if (blocked) {
+      setRaceResults([]);
+      setIsInitialized(true);
+      return;
+    }
+    try {
+      const results = await queryRaceResults({
+        swimmerId,
+        country,
+        startDate: startTs !== undefined ? new Date(startTs) : undefined,
+        endDate: endTs !== undefined ? new Date(endTs) : undefined,
+      });
+      setRaceResults(results);
+    } catch (error) {
+      console.error('Failed to load race results:', error);
+      setRaceResults([]);
+    } finally {
+      setIsInitialized(true);
+    }
+  }, [swimmerId, country, startTs, endTs, blocked]);
 
   useEffect(() => {
     setIsInitialized(false);
-    
-    const unsubscribe = subscribeToRaceResults((allResults) => {
-      let results = [...allResults];
-
-      if (country) {
-        results = results.filter((r) => r.country === country);
-      } else if (userId) {
-        results = results.filter((r) => r.swimmerId === userId);
-      }
-
-      // Filter by date range if provided
-      if (dateRange) {
-        results = results.filter((r) => {
-          const raceDate = new Date(r.date);
-          return raceDate >= dateRange.startDate && raceDate <= dateRange.endDate;
-        });
-      }
-      
-      // Sort by date descending in memory
-      results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      setRaceResults(results);
-      setIsInitialized(true);
-    });
-
-    return () => unsubscribe();
-  }, [userId, dateRange, country, global]);
+    load();
+  }, [load]);
 
   const addRaceResult = useCallback(async (result: Omit<RaceResult, 'id' | 'date'>) => {
-    const currentUserId = getCurrentUserId();
-    if (!currentUserId || !profile) return;
     try {
-      const newRace = { 
-        ...result, 
-        swimmerId: currentUserId, 
-        country: profile.country, 
-        date: new Date().toISOString(),
-        unit: result.unit || 'meters'
-      };
-      await addRaceResultService(newRace);
-      addLocalRaceResult({ ...newRace, id: 'temp-' + Date.now() });
+      await addRaceResultService({
+        event: result.event,
+        totalTime: result.totalTime,
+        laps: result.laps,
+        unit: result.unit || 'meters',
+      });
+      await load();
     } catch (error) {
-      console.error('Failed to initiate race result save:', error);
+      console.error('Failed to save race result:', error);
+      throw error;
     }
-  }, [profile, addLocalRaceResult]);
+  }, [load]);
 
   const removeRaceResult = useCallback(async (id: string) => {
     try {
       await removeRaceResultService(id);
+      setRaceResults((prev) => prev.filter((r) => r.id !== id));
     } catch (error) {
-      console.error('Failed to initiate race result removal:', error);
+      console.error('Failed to remove race result:', error);
     }
   }, []);
 
-  return { raceResults, addRaceResult, removeRaceResult, isInitialized };
+  return { raceResults, addRaceResult, removeRaceResult, isInitialized, refetch: load };
+}
+
+/** The signed-in swimmer's own results (used for "Your League Standings"). */
+export function useMyRaceResults(options: { dateRange?: { startDate: Date; endDate: Date } } = {}) {
+  return useRaceResults({ ...options, mine: true });
 }
