@@ -31,10 +31,28 @@ export async function POST() {
 
     const name = profile.name;
     const resend = new Resend(apiKey);
-    await resend.emails.send({
+    const greetingName = name || 'Swimmer';
+    // Resend reports failures in `error` instead of throwing, so check it before
+    // recording the email as sent; otherwise a failed send is never retried.
+    const { error: sendError } = await resend.emails.send({
       from: 'Dual Swim <welcome@dualswim.app>',
       to: [user.email],
-      subject: `Welcome to Dual, ${name || 'Swimmer'}! 🏊‍♂️`,
+      subject: `Welcome to Dual, ${greetingName}! 🏊‍♂️`,
+      text: [
+        `Welcome to Dual, ${greetingName}!`,
+        '',
+        'Your account is ready and your 14-day free trial of Dual Pro has started. Every feature is unlocked; when the trial ends you can pick the plan that suits you.',
+        '',
+        'What you can do right now:',
+        '- Enter virtual swim meets and head-to-head duals',
+        '- Generate AI workouts tailored to your goals',
+        '- Track your personal bests and compare times worldwide',
+        '- Design your team logo under Profile > My Team',
+        '',
+        'Go to your dashboard: https://dualswim.app/dashboard',
+        '',
+        '- The Dual team',
+      ].join('\n'),
       html: `
           <!DOCTYPE html>
           <html>
@@ -64,9 +82,10 @@ export async function POST() {
                     <li><strong>Enter Virtual Swim Meets:</strong> Join global public and private dual races.</li>
                     <li><strong>AI Workout Generator:</strong> Create customized training sessions tailored to your goals.</li>
                     <li><strong>Track Personal Bests:</strong> Monitor your stroke progress and compare times globally.</li>
+                    <li><strong>Build Your Team:</strong> Design your team logo under Profile → My Team; it shows on the Dual face-off screen.</li>
                   </ul>
                   <div style="text-align: center;">
-                    <a href="https://dualswim.app/dashboard" class="btn">Go to Dual Dashboard →</a>
+                    <a href="https://dualswim.app/dashboard" class="btn" style="display:inline-block;padding:14px 28px;background:#f97316;background-image:linear-gradient(90deg,#f97316,#f59e0b);color:#ffffff;font-weight:bold;text-decoration:none;border-radius:8px;margin-top:20px;">Go to Dual Dashboard →</a>
                   </div>
                 </div>
                 <div class="footer">
@@ -78,6 +97,11 @@ export async function POST() {
           </html>
         `,
     });
+
+    if (sendError) {
+      console.error('Welcome Email Error (Resend):', sendError);
+      return NextResponse.json({ error: 'Failed to send welcome email' }, { status: 502 });
+    }
 
     await admin.from('profiles').update({ welcome_sent_at: new Date().toISOString() }).eq('id', user.id);
     return NextResponse.json({ success: true, delivered: true });
